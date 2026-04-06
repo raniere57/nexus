@@ -1,0 +1,41 @@
+# Node / Bun
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun.lockb
+package-lock.json
+
+# Databases
+*.db
+*.sqlite
+backend/data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project-specific
+repomix-output.xml
+frontend/dist/
+backend/dist/
+temp/
+/tmp/
