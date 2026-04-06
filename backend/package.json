@@ -1,0 +1,23 @@
+{
+  "name": "nexus-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "seed": "bun src/seed.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "elysia": "^1.0.0",
+    "@elysiajs/cors": "^1.0.0",
+    "@elysiajs/swagger": "^1.0.0",
+    "ping": "^0.4.4"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "@types/node": "^20.0.0",
+    "@types/ping": "^0.4.4",
+    "typescript": "^5.0.0"
+  }
+}

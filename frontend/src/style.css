@@ -1,0 +1,104 @@
+:root {
+  /* Ultra-dark tech background */
+  --bg-core: #030508;
+  --bg-surface: rgba(12, 16, 24, 0.6);
+  --bg-surface-hover: rgba(22, 28, 40, 0.8);
+  
+  /* Status Colors */
+  --color-online: #10b981;    /* Emerald */
+  --color-online-glow: rgba(16, 185, 129, 0.4);
+  
+  --color-degraded: #f59e0b;  /* Amber */
+  --color-degraded-glow: rgba(245, 158, 11, 0.4);
+  
+  --color-offline: #ef4444;   /* Red */
+  --color-offline-glow: rgba(239, 68, 68, 0.4);
+  
+  --color-unknown: #4b5563;   /* Slate/Grey */
+  --color-unknown-glow: rgba(75, 85, 99, 0.4);
+
+  /* Accents */
+  --color-accent: #0ea5e9;    /* Cyan/Blue secondary */
+  --color-accent-glow: rgba(14, 165, 233, 0.2);
+  
+  /* Text */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #475569;
+
+  /* Fonts */
+  --font-main: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  /* Borders */
+  --border-subtle: rgba(56, 189, 248, 0.1);
+  --border-strong: rgba(56, 189, 248, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-core);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography Helpers */
+h1, h2, h3, h4 {
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 10px var(--glow-color, transparent), inset 0 0 5px var(--glow-color, transparent); }
+  50% { box-shadow: 0 0 25px var(--glow-color, transparent), inset 0 0 10px var(--glow-color, transparent); }
+  100% { box-shadow: 0 0 10px var(--glow-color, transparent), inset 0 0 5px var(--glow-color, transparent); }
+}
+
+@keyframes breathe {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.5; }
+}
+
+/* Global utility classes for status */
+.status-online {
+  --status-color: var(--color-online);
+  --glow-color: var(--color-online-glow);
+}
+
+.status-degraded {
+  --status-color: var(--color-degraded);
+  --glow-color: var(--color-degraded-glow);
+}
+
+.status-offline {
+  --status-color: var(--color-offline);
+  --glow-color: var(--color-offline-glow);
+}
+
+.status-unknown {
+  --status-color: var(--color-unknown);
+  --glow-color: var(--color-unknown-glow);
+}
