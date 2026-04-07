@@ -1,5 +1,5 @@
 export type ServiceStatus = 'online' | 'degraded' | 'offline' | 'unknown';
-export type CheckerType = 'ping' | 'http';
+export type CheckerType = 'ping' | 'http' | 'command';
 export type CheckerStatus = 'success' | 'failure' | 'timeout' | 'error';
 
 export interface Service {

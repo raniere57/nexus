@@ -2,6 +2,7 @@ import { getAllServices, getServiceSnapshotById, createOrUpdateSnapshot } from '
 import { getCheckersByServiceId, createCheckerResult, getRecentResultsByService } from '../checkers/repository.js';
 import { executePingChecker } from '../../checkers/ping/index.js';
 import { executeHttpChecker } from '../../checkers/http/index.js';
+import { executeCommandChecker } from '../../checkers/command/index.js';
 import { broadcastStatusUpdate } from '../realtime/websocket.js';
 import type { Checker, Service, ServiceSnapshot, ServiceStatus } from '../../shared/types.js';
 import { aggregateStatus } from './aggregator.js';
@@ -75,6 +76,8 @@ export async function checkService(service: Service) {
           result = await executePingChecker(checker, service.host, service.timeoutSeconds);
         } else if (checker.type === 'http') {
           result = await executeHttpChecker(checker, service.baseUrl, service.timeoutSeconds);
+        } else if (checker.type === 'command') {
+          result = await executeCommandChecker(checker, service.timeoutSeconds);
         } else {
           throw new Error(`Unsupported checker type: ${checker.type}`);
         }

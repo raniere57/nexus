@@ -176,6 +176,7 @@
               <select v-model="checkerModal.form.type" required :disabled="checkerModal.isEdit">
                 <option value="http">HTTP Fetch</option>
                 <option value="ping">System Ping</option>
+                <option value="command">Script / Command</option>
               </select>
             </div>
             <div class="form-group half">
@@ -226,6 +227,18 @@
                 <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
               </div>
             </div>
+
+            <div v-if="checkerModal.form.type === 'command'" class="config-section">
+              <div class="form-group">
+                <label>Shell Command</label>
+                <input v-model="checkerModal.config.command" type="text" placeholder="e.g. curl -sSf http://127.0.0.1:9099" required />
+                <small>Exit code 0 means SUCCESS. Other codes mean FAILURE. Running inside Docker container.</small>
+              </div>
+              <div class="form-group">
+                <label>Timeout Overwrite</label>
+                <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
+              </div>
+            </div>
           </div>
 
           <div v-if="checkerModal.error" class="modal-error">{{ checkerModal.error }}</div>
@@ -269,7 +282,7 @@ const checkerModal = reactive({
   checkerId: null as string | null,
   form: {
     name: '',
-    type: 'http' as 'http' | 'ping',
+    type: 'http' as 'http' | 'ping' | 'command',
     isActive: true
   },
   config: {} as any
@@ -335,7 +348,8 @@ const openCheckerModal = (checker: Checker | null) => {
     checkerModal.config = {
       method: 'GET',
       url: '',
-      expectedStatus: 200
+      expectedStatus: 200,
+      command: '' // For command type
     };
   }
 };
@@ -386,6 +400,7 @@ const goToEditService = () => {
 const formatConfigSummary = (checker: Checker) => {
   const conf = JSON.parse(checker.configJson || '{}');
   if (checker.type === 'http') return `${conf.method} ${conf.url}`;
+  if (checker.type === 'command') return `Cmd: ${conf.command || ''}`;
   return `Ping ${conf.host || service.value?.host || 'default'}`;
 };
 
