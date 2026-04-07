@@ -22,6 +22,9 @@ function validateConfig(checkerType: string, configJson?: string): string | null
   } else if (checkerType === 'ping') {
     if (!parsed.host || typeof parsed.host !== 'string') return 'Ping checker requires a valid host string';
     if (parsed.timeoutSeconds && (typeof parsed.timeoutSeconds !== 'number' || parsed.timeoutSeconds <= 0)) return 'timeoutSeconds must be > 0';
+  } else if (checkerType === 'command') {
+    if (!parsed.command || typeof parsed.command !== 'string') return 'Command checker requires a shell command string';
+    if (parsed.timeoutSeconds && (typeof parsed.timeoutSeconds !== 'number' || parsed.timeoutSeconds <= 0)) return 'timeoutSeconds must be > 0';
   }
   return null;
 }
@@ -56,7 +59,7 @@ export const checkersRoutes = new Elysia()
       return { success: true, data: created };
     }, {
       body: t.Object({
-        type: t.Union([t.Literal('ping'), t.Literal('http')]),
+        type: t.Union([t.Literal('ping'), t.Literal('http'), t.Literal('command')]),
         name: t.String({ minLength: 1, error: 'Name cannot be empty' }),
         configJson: t.Optional(t.String()),
         isActive: t.Optional(t.Boolean())
@@ -67,9 +70,9 @@ export const checkersRoutes = new Elysia()
     .put('/:id', ({ params: { id }, body, set }) => {
       const bodyData = body as any;
       if (bodyData.type) {
-         if (bodyData.type !== 'ping' && bodyData.type !== 'http') {
+         if (bodyData.type !== 'ping' && bodyData.type !== 'http' && bodyData.type !== 'command') {
            set.status = 400;
-           return { success: false, message: 'type must be ping or http' };
+           return { success: false, message: 'type must be ping, http or command' };
          }
          const validationError = validateConfig(bodyData.type, bodyData.configJson);
          if (validationError) {
