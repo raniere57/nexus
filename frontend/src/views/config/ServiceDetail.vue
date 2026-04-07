@@ -388,10 +388,12 @@ const handleTestChecker = async () => {
       serviceId: serviceId.value
     };
     const response = await checkersApi.test(payload);
+    console.log('[NEXUS TEST] Result:', response);
+    
     if (response.success) {
       checkerModal.testResult = response.result;
     } else {
-      checkerModal.error = response.message;
+      checkerModal.error = response.message || 'Unknown test error';
     }
   } catch (e: any) {
     checkerModal.error = e.message;

@@ -78,14 +78,7 @@ export const checkersApi = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
-  }).then(res => fetch('/api/checkers/test', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  }).then(res => {
-    // We don't use handleResponse here directly because we want the envelope { success, result, message }
-    return res.json();
-  }))
+  }).then(res => res.json())
 };
 
 export const monitoringApi = {
