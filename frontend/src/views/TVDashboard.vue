@@ -1,6 +1,6 @@
 <template>
   <div class="nexus-app tv-mode">
-    <TVPerformanceBackground />
+    <component :is="isTvMode ? TVPerformanceBackground : BackgroundCanvas" />
     
     <header class="nexus-header">
       <div class="header-content">
@@ -17,7 +17,7 @@
     </header>
 
     <main class="nexus-main">
-      <NodeNetwork :services="services" :isTvMode="true" />
+      <NodeNetwork :services="services" :isTvMode="isTvMode" />
     </main>
     
     <aside class="nexus-sidebar">
@@ -31,12 +31,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import TVPerformanceBackground from '../components/TVPerformanceBackground.vue';
+import BackgroundCanvas from '../components/BackgroundCanvas.vue';
 import NodeNetwork from '../components/NodeNetwork.vue';
 import StatusSummary from '../components/StatusSummary.vue';
 import ServerDock from '../components/ServerDock.vue';
 import { useNexus } from '../composables/useNexus';
 
 const { services, servers } = useNexus();
+
+// Detect Smart TV (WebOS, Tizen, etc)
+const isTvMode = ref(false);
 const currentTime = ref('');
 let timeInterval: any = null;
 
@@ -54,6 +58,10 @@ const updateTime = () => {
 };
 
 onMounted(() => {
+  // Detect if browser is a Smart TV
+  const ua = navigator.userAgent.toLowerCase();
+  isTvMode.value = /smart-tv|webos|tizen|hbbtv|appletv|roku|playstation|xbox|nintendo|googletv|android tv|viera/i.test(ua);
+  
   updateTime();
   timeInterval = setInterval(updateTime, 1000);
 });
