@@ -173,7 +173,7 @@
           <div class="form-row">
             <div class="form-group half">
               <label>Type</label>
-              <select v-model="checkerModal.form.type" required :disabled="checkerModal.isEdit">
+              <select v-model="checkerModal.form.type" required :disabled="checkerModal.isEdit" @change="handleTypeChange">
                 <option value="http">HTTP Fetch</option>
                 <option value="ping">System Ping</option>
                 <option value="command">Script / Command</option>
@@ -349,6 +349,18 @@ const fetchSnapshots = async () => {
   snapshots.value = await monitoringApi.getServiceStatus();
 };
 
+const handleTypeChange = () => {
+  // Clear config except command if switching to command, or URL if switching to HTTP
+  const newType = checkerModal.form.type;
+  if (newType === 'command') {
+    checkerModal.config = { command: (checkerModal.config.url && checkerModal.config.url.startsWith('curl')) ? checkerModal.config.url : '' };
+  } else if (newType === 'http') {
+    checkerModal.config = { method: 'GET', url: '', expectedStatus: 200 };
+  } else {
+    checkerModal.config = { host: '' };
+  }
+};
+
 const openCheckerModal = (checker: Checker | null) => {
   checkerModal.show = true;
   checkerModal.isEdit = !!checker;
@@ -383,10 +395,11 @@ const handleTestChecker = async () => {
   checkerModal.error = null;
   try {
     const payload = {
-      type: checkerModal.form.type,
+      type: String(checkerModal.form.type), // Cast to string explicitly
       configJson: JSON.stringify(checkerModal.config),
       serviceId: serviceId.value
     };
+    console.log('[NEXUS TEST] Submitting payload:', payload);
     const response = await checkersApi.test(payload);
     console.log('[NEXUS TEST] Result:', response);
     
