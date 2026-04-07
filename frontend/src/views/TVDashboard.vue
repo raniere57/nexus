@@ -1,6 +1,6 @@
 <template>
   <div class="nexus-app tv-mode">
-    <BackgroundCanvas />
+    <TVPerformanceBackground />
     
     <header class="nexus-header">
       <div class="header-content">
@@ -17,7 +17,7 @@
     </header>
 
     <main class="nexus-main">
-      <NodeNetwork :services="services" />
+      <NodeNetwork :services="services" :isTvMode="true" />
     </main>
     
     <aside class="nexus-sidebar">
@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import BackgroundCanvas from '../components/BackgroundCanvas.vue';
+import TVPerformanceBackground from '../components/TVPerformanceBackground.vue';
 import NodeNetwork from '../components/NodeNetwork.vue';
 import StatusSummary from '../components/StatusSummary.vue';
 import ServerDock from '../components/ServerDock.vue';

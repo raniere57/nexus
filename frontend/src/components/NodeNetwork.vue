@@ -1,5 +1,5 @@
 <template>
-  <div class="node-network">
+  <div class="node-network" :class="{ 'tv-perf': isTvMode }">
     <div class="core-node">
       <div class="core-rings">
         <div class="ring r1"></div>
@@ -48,7 +48,8 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import type { NexusService } from '../types';
 
 const props = defineProps<{
-  services: NexusService[]
+  services: NexusService[],
+  isTvMode?: boolean
 }>();
 
 // Simple circular layout calculation
@@ -99,7 +100,9 @@ const animate = (time: number) => {
   lastTime = time;
 
   // Move extremely slowly: full rotation roughly every 4 minutes (assuming 60fps)
-  rotationOffset.value += (Math.PI * 2) / 14400;
+  // In TV mode, core rotation is nearly zero to save GPU/Repaint cycles
+  const rotationIncrement = props.isTvMode ? (Math.PI * 2) / 120000 : (Math.PI * 2) / 14400;
+  rotationOffset.value += rotationIncrement;
   if (rotationOffset.value > Math.PI * 2) rotationOffset.value -= Math.PI * 2;
   
   // Handle Core Flash Decay
@@ -197,7 +200,14 @@ const animate = (time: number) => {
     if (b.opacity > 1) b.opacity = 1;
   });
 
-  animationId = requestAnimationFrame(animate);
+  const frameDelay = props.isTvMode ? 33 : 0; // Target ~30fps on TV to save CPU
+  if (frameDelay > 0) {
+    setTimeout(() => {
+      animationId = requestAnimationFrame(animate);
+    }, frameDelay);
+  } else {
+    animationId = requestAnimationFrame(animate);
+  }
 };
 
 onMounted(() => {
@@ -324,19 +334,23 @@ const getNodeStyle = (index: number, total: number) => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  background: var(--glow-color);
-  filter: blur(25px);
-  opacity: 0.5;
+  /* Use radial gradient instead of filter:blur for TV performance */
+  background: radial-gradient(circle, var(--glow-color) 0%, transparent 70%);
+  opacity: 0.3;
   z-index: 0;
+}
+
+.node-network:not(.tv-perf) .node-glow {
+  filter: blur(25px);
   animation: breathe 3s infinite ease-in-out;
 }
 
 .node-body {
   position: relative;
-  background: var(--bg-surface);
+  background: rgba(12, 16, 24, 0.95); /* Solid dark instead of backdrop-blur */
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 0.75rem 1rem;
@@ -344,10 +358,13 @@ const getNodeStyle = (index: number, total: number) => {
   align-items: center;
   gap: 0.75rem;
   min-width: 160px;
-  backdrop-filter: blur(10px);
   z-index: 1;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.8);
   transition: all 1.8s ease-out;
+}
+
+.node-network:not(.tv-perf) .node-body {
+  backdrop-filter: blur(10px);
 }
 
 /* Status specifics */
