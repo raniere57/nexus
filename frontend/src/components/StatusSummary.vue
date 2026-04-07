@@ -33,6 +33,19 @@
       </div>
     </div>
 
+    <div v-if="offlineServers.length > 0" class="critical-section">
+      <h3 class="section-title text-offline">INFRASTRUCTURE OFFLINE</h3>
+      <div class="alert-list">
+        <div v-for="srv in offlineServers" :key="srv.serverId" class="alert-item">
+          <div class="alert-indicator"></div>
+          <div class="alert-info">
+            <div class="alert-name">{{ srv.serverName }}</div>
+            <div class="alert-time">Host: {{ srv.host }} — Unreachable</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="degradedServices.length > 0" class="degraded-section">
       <h3 class="section-title text-degraded">DEGRADED NODES</h3>
       <div class="alert-list">
@@ -61,10 +74,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { NexusService } from '../types';
+import type { NexusService, NexusServer } from '../types';
 
 const props = defineProps<{
   services: NexusService[]
+  servers: NexusServer[]
 }>();
 
 const onlineCount = computed(() => props.services.filter(s => s.overallStatus === 'online').length);
@@ -72,6 +86,7 @@ const offlineCount = computed(() => props.services.filter(s => s.overallStatus =
 
 const criticalServices = computed(() => props.services.filter(s => s.overallStatus === 'offline'));
 const degradedServices = computed(() => props.services.filter(s => s.overallStatus === 'degraded'));
+const offlineServers = computed(() => (props.servers || []).filter(s => s.status === 'offline'));
 
 const recentServices = computed(() => {
   return [...props.services]

@@ -21,7 +21,7 @@
     </main>
     
     <aside class="nexus-sidebar">
-      <StatusSummary :services="services" />
+      <StatusSummary :services="services" :servers="servers" />
     </aside>
 
     <ServerDock :servers="servers" />
@@ -43,6 +43,7 @@ let timeInterval: any = null;
 const systemStatusText = computed(() => {
   if (!services.value || services.value.length === 0) return 'INITIALIZING...';
   if (services.value.some(s => s.overallStatus === 'offline')) return 'CRITICAL';
+  if (servers.value.some(s => s.status === 'offline')) return 'CRITICAL';
   if (services.value.some(s => s.overallStatus === 'degraded')) return 'DEGRADED';
   return 'ONLINE';
 });
