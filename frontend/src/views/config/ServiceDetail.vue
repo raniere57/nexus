@@ -243,15 +243,18 @@
 
           <div v-if="checkerModal.error" class="modal-error">{{ checkerModal.error }}</div>
 
-          <div class="modal-actions">
-            <button type="button" @click="handleTestChecker" class="btn btn-secondary" :disabled="checkerModal.loading || checkerModal.testing">
-              {{ checkerModal.testing ? 'Testing...' : 'Test Checker' }}
-            </button>
-            <div class="flex-spacer"></div>
-            <button type="button" @click="checkerModal.show = false" class="btn btn-ghost-dark">Cancel</button>
-            <button type="submit" class="btn btn-primary" :disabled="checkerModal.loading || checkerModal.testing">
-              {{ checkerModal.loading ? 'Saving...' : 'Save Checker' }}
-            </button>
+          <div class="modal-actions-container">
+            <div class="test-action">
+              <button type="button" @click="handleTestChecker" class="btn btn-test" :disabled="checkerModal.loading || checkerModal.testing">
+                {{ checkerModal.testing ? 'Testing...' : 'Test Connection' }}
+              </button>
+            </div>
+            <div class="main-actions">
+              <button type="button" @click="checkerModal.show = false" class="btn btn-secondary">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="checkerModal.loading || checkerModal.testing">
+                {{ checkerModal.loading ? 'Saving...' : 'Save Checker' }}
+              </button>
+            </div>
           </div>
           
           <!-- Test Result Display -->
@@ -858,38 +861,60 @@ onMounted(() => {
   border: 1px dashed rgba(56, 189, 248, 0.1);
   border-radius: 6px;
 }
-.flex-spacer {
-  flex: 1;
+.modal-actions-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(56, 189, 248, 0.1);
 }
 
-.btn-ghost-dark {
-  background: transparent;
-  color: #64748b;
-  border: none;
+.main-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-test {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0ea5e9;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+.btn-test:hover:not(:disabled) {
+  background: #0ea5e9;
+  color: #fff;
 }
 
 .test-result-box {
   margin-top: 1.5rem;
-  padding: 1rem;
+  padding: 1.5rem;
   border-radius: 4px;
   font-size: 0.85rem;
   border: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.3);
 }
 
-.result-success { background: rgba(16, 185, 129, 0.05); color: #10b981; border-left: 3px solid #10b981; }
-.result-failure, .result-error, .result-timeout { background: rgba(239, 68, 68, 0.05); color: #ef4444; border-left: 3px solid #ef4444; }
+.result-success { border-left: 4px solid #10b981; color: #10b981; }
+.result-failure, .result-error, .result-timeout { border-left: 4px solid #ef4444; color: #ef4444; }
 
 .result-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.8rem;
   font-weight: 700;
   font-family: var(--font-mono);
+  font-size: 1rem;
 }
 
 .result-error {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  opacity: 0.8;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  background: rgba(0,0,0,0.4);
+  padding: 0.8rem;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 </style>
