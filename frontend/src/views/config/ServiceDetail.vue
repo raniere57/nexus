@@ -390,10 +390,14 @@ const handleTestChecker = async () => {
     const response = await checkersApi.test(payload);
     console.log('[NEXUS TEST] Result:', response);
     
-    if (response.success) {
-      checkerModal.testResult = response.result;
+    // According to logs, Elysia/Aggregator is wrapping in 'data'
+    const success = response.success || (response.data && response.data.success);
+    const result = response.result || (response.data && response.data.result);
+    
+    if (success && result) {
+      checkerModal.testResult = result;
     } else {
-      checkerModal.error = response.message || 'Unknown test error';
+      checkerModal.error = response.message || (response.data && response.data.message) || 'Unknown test error';
     }
   } catch (e: any) {
     checkerModal.error = e.message;

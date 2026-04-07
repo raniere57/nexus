@@ -2,7 +2,7 @@ FROM oven/bun:1 as base
 WORKDIR /usr/src/app
 
 # Install ping, ssh and sshpass dependencies
-RUN apt-get update && apt-get install -y iputils-ping openssh-client sshpass && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y iputils-ping openssh-client sshpass curl && rm -rf /var/lib/apt/lists/*
 
 COPY package.json ./
 RUN bun install
