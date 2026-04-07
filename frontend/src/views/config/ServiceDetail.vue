@@ -244,10 +244,28 @@
           <div v-if="checkerModal.error" class="modal-error">{{ checkerModal.error }}</div>
 
           <div class="modal-actions">
-            <button type="button" @click="checkerModal.show = false" class="btn btn-secondary">Cancel</button>
-            <button type="submit" class="btn btn-primary" :disabled="checkerModal.loading">
+            <button type="button" @click="handleTestChecker" class="btn btn-secondary" :disabled="checkerModal.loading || checkerModal.testing">
+              {{ checkerModal.testing ? 'Testing...' : 'Test Checker' }}
+            </button>
+            <div class="flex-spacer"></div>
+            <button type="button" @click="checkerModal.show = false" class="btn btn-ghost-dark">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="checkerModal.loading || checkerModal.testing">
               {{ checkerModal.loading ? 'Saving...' : 'Save Checker' }}
             </button>
+          </div>
+          
+          <!-- Test Result Display -->
+          <div v-if="checkerModal.testResult" class="test-result-box" :class="'result-' + checkerModal.testResult.status">
+            <div class="result-header">
+              <span class="result-status">{{ checkerModal.testResult.status.toUpperCase() }}</span>
+              <span v-if="checkerModal.testResult.responseTimeMs" class="result-time">{{ checkerModal.testResult.responseTimeMs }}ms</span>
+            </div>
+            <div v-if="checkerModal.testResult.errorMessage" class="result-error">
+              {{ checkerModal.testResult.errorMessage }}
+            </div>
+            <div v-else class="result-success">
+              Checker verified successfully.
+            </div>
           </div>
         </form>
       </div>
@@ -280,6 +298,8 @@ const checkerModal = reactive({
   loading: false,
   error: null as string | null,
   checkerId: null as string | null,
+  testing: false,
+  testResult: null as any | null,
   form: {
     name: '',
     type: 'http' as 'http' | 'ping' | 'command',
@@ -351,6 +371,29 @@ const openCheckerModal = (checker: Checker | null) => {
       expectedStatus: 200,
       command: '' // For command type
     };
+  }
+};
+
+const handleTestChecker = async () => {
+  checkerModal.testing = true;
+  checkerModal.testResult = null;
+  checkerModal.error = null;
+  try {
+    const payload = {
+      type: checkerModal.form.type,
+      configJson: JSON.stringify(checkerModal.config),
+      serviceId: serviceId.value
+    };
+    const response = await checkersApi.test(payload);
+    if (response.success) {
+      checkerModal.testResult = response.result;
+    } else {
+      checkerModal.error = response.message;
+    }
+  } catch (e: any) {
+    checkerModal.error = e.message;
+  } finally {
+    checkerModal.testing = false;
   }
 };
 
@@ -814,5 +857,39 @@ onMounted(() => {
   text-align: center;
   border: 1px dashed rgba(56, 189, 248, 0.1);
   border-radius: 6px;
+}
+.flex-spacer {
+  flex: 1;
+}
+
+.btn-ghost-dark {
+  background: transparent;
+  color: #64748b;
+  border: none;
+}
+
+.test-result-box {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.result-success { background: rgba(16, 185, 129, 0.05); color: #10b981; border-left: 3px solid #10b981; }
+.result-failure, .result-error, .result-timeout { background: rgba(239, 68, 68, 0.05); color: #ef4444; border-left: 3px solid #ef4444; }
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.result-error {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  opacity: 0.8;
 }
 </style>

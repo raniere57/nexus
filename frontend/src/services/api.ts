@@ -73,7 +73,19 @@ export const checkersApi = {
   }).then(res => handleResponse<Checker>(res)),
   delete: (id: string) => fetch(`/api/checkers/${id}`, {
     method: 'DELETE'
-  }).then(res => handleResponse<{ success: boolean }>(res))
+  }).then(res => handleResponse<{ success: boolean }>(res)),
+  test: (data: { type: string, configJson: string, serviceId: string }) => fetch('/api/checkers/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(res => fetch('/api/checkers/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(res => {
+    // We don't use handleResponse here directly because we want the envelope { success, result, message }
+    return res.json();
+  }))
 };
 
 export const monitoringApi = {

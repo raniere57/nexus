@@ -2,6 +2,9 @@ import { Elysia, t } from 'elysia';
 import { randomUUID } from 'crypto';
 import * as repo from './repository.js';
 import { getServiceById } from '../services/repository.js';
+import { executeHttpChecker } from '../../checkers/http/index.js';
+import { executePingChecker } from '../../checkers/ping/index.js';
+import { executeCommandChecker } from '../../checkers/command/index.js';
 import type { Checker, CheckerType } from '../../shared/types.js';
 
 function validateConfig(checkerType: string, configJson?: string): string | null {
@@ -102,5 +105,49 @@ export const checkersRoutes = new Elysia()
         return { success: false, message: 'Checker not found' };
       }
       return { success: true };
+    })
+    .post('/test', async ({ body, set }) => {
+      const { type, configJson, serviceId } = body as any;
+      const service = getServiceById(serviceId);
+      const timeout = service?.timeoutSeconds || 10;
+      
+      const validationError = validateConfig(type, configJson);
+      if (validationError) {
+        set.status = 400;
+        return { success: false, message: validationError };
+      }
+
+      const tempChecker: Checker = {
+        id: 'test',
+        serviceId,
+        type,
+        configJson,
+        name: 'Test',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        let result;
+        if (type === 'http') {
+          result = await executeHttpChecker(tempChecker, service?.baseUrl || '', timeout);
+        } else if (type === 'ping') {
+          result = await executePingChecker(tempChecker, service?.host || '127.0.0.1', timeout);
+        } else if (type === 'command') {
+          result = await executeCommandChecker(tempChecker, timeout);
+        } else {
+          return { success: false, message: 'Invalid type' };
+        }
+        return { success: true, result };
+      } catch (e: any) {
+        return { success: false, message: e.message };
+      }
+    }, {
+      body: t.Object({
+        type: t.String(),
+        configJson: t.String(),
+        serviceId: t.String()
+      })
     })
   );
