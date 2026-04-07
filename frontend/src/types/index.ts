@@ -68,6 +68,33 @@ export interface ApiResponse<T> {
 }
 
 export interface StatusUpdatePayload {
-  type: 'status_update' | 'initial_state';
+  type: 'status_update' | 'initial_state' | 'server_update' | 'initial_server_state';
   data: any;
+}
+
+export type ServerStatus = 'online' | 'offline' | 'unknown';
+
+export interface Server {
+  id: string;
+  name: string;
+  host: string;
+  sshPort: number;
+  sshUser: string;
+  sshPassword: string;
+  checkIntervalSeconds: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NexusServer {
+  serverId: string;
+  serverName: string;
+  host: string;
+  status: ServerStatus;
+  cpuPercent: number | null;
+  ramPercent: number | null;
+  diskPercent: number | null;
+  uptimeSeconds: number | null;
+  lastCheckedAt: string | null;
 }

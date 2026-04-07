@@ -70,6 +70,30 @@ export function initDB() {
       role TEXT PRIMARY KEY,
       password_hash TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS servers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      host TEXT NOT NULL,
+      sshPort INTEGER DEFAULT 22,
+      sshUser TEXT DEFAULT 'root',
+      sshPassword TEXT DEFAULT '',
+      checkIntervalSeconds INTEGER DEFAULT 60,
+      isActive INTEGER DEFAULT 1,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS server_snapshots (
+      serverId TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'unknown',
+      cpuPercent REAL,
+      ramPercent REAL,
+      diskPercent REAL,
+      uptimeSeconds INTEGER,
+      lastCheckedAt TEXT,
+      FOREIGN KEY(serverId) REFERENCES servers(id) ON DELETE CASCADE
+    );
   `);
 
   // Simple migrations for new columns
@@ -77,6 +101,18 @@ export function initDB() {
   try { db.exec("ALTER TABLE services ADD COLUMN environment TEXT DEFAULT 'production';"); } catch (e) {}
   try { db.exec("ALTER TABLE services ADD COLUMN checkIntervalSeconds INTEGER DEFAULT 60;"); } catch (e) {}
   try { db.exec("ALTER TABLE services ADD COLUMN timeoutSeconds INTEGER DEFAULT 10;"); } catch (e) {}
+
+  // Migration: rename sshKeyPath → sshPassword (SQLite doesn't support RENAME COLUMN on older versions)
+  try {
+    const cols = db.query("PRAGMA table_info(servers)").all() as { name: string }[];
+    const hasOldCol = cols.some(c => c.name === 'sshKeyPath');
+    const hasNewCol = cols.some(c => c.name === 'sshPassword');
+    if (hasOldCol && !hasNewCol) {
+      db.exec("ALTER TABLE servers RENAME COLUMN sshKeyPath TO sshPassword;");
+    } else if (!hasOldCol && !hasNewCol) {
+      db.exec("ALTER TABLE servers ADD COLUMN sshPassword TEXT DEFAULT '';");
+    }
+  } catch (e) {}
 
   try {
     const checkAuth = db.query(`SELECT COUNT(*) as c FROM auth_roles`).get() as { c: number };

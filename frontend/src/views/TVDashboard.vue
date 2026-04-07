@@ -23,6 +23,8 @@
     <aside class="nexus-sidebar">
       <StatusSummary :services="services" />
     </aside>
+
+    <ServerDock :servers="servers" />
   </div>
 </template>
 
@@ -31,9 +33,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import BackgroundCanvas from '../components/BackgroundCanvas.vue';
 import NodeNetwork from '../components/NodeNetwork.vue';
 import StatusSummary from '../components/StatusSummary.vue';
+import ServerDock from '../components/ServerDock.vue';
 import { useNexus } from '../composables/useNexus';
 
-const { services } = useNexus();
+const { services, servers } = useNexus();
 const currentTime = ref('');
 let timeInterval: any = null;
 

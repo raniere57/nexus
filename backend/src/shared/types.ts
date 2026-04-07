@@ -47,3 +47,28 @@ export interface ServiceSnapshot {
   lastFailureAt: string | null;
   checkerSummaryJson: string; // JSON object representing { checkerId: status }
 }
+
+export type ServerStatus = 'online' | 'offline' | 'unknown';
+
+export interface Server {
+  id: string;
+  name: string;
+  host: string;
+  sshPort: number;
+  sshUser: string;
+  sshPassword: string;
+  checkIntervalSeconds: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServerSnapshot {
+  serverId: string;
+  status: ServerStatus;
+  cpuPercent: number | null;
+  ramPercent: number | null;
+  diskPercent: number | null;
+  uptimeSeconds: number | null;
+  lastCheckedAt: string | null;
+}

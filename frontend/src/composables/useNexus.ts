@@ -1,7 +1,8 @@
 import { ref, onMounted, onUnmounted } from 'vue';
-import type { NexusService, StatusUpdatePayload } from '../types';
+import type { NexusService, NexusServer, StatusUpdatePayload } from '../types';
 
 const services = ref<NexusService[]>([]);
+const servers = ref<NexusServer[]>([]);
 
 export function useNexus() {
   let ws: WebSocket | null = null;
@@ -19,11 +20,21 @@ export function useNexus() {
     }
   };
 
+  const fetchInitialServers = async () => {
+    try {
+      const res = await fetch('/api/servers/status');
+      if (res.ok) {
+        const payload = await res.json();
+        servers.value = payload && payload.success && Array.isArray(payload.data) ? payload.data : payload;
+      }
+    } catch (e) {
+      console.error('Failed to fetch initial server state', e);
+    }
+  };
+
   const initWebSocket = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host; // Vite proxy handles this in dev! Or use import.meta.env
-    // In dev, vite proxy does not always proxy websockets well without setup, 
-    // but assuming standard setup:
+    const host = window.location.host;
     ws = new WebSocket(`${protocol}//${host}/ws/status`);
 
     ws.onopen = () => {
@@ -41,7 +52,6 @@ export function useNexus() {
             : payload.data.checkerSummaryJson;
 
           if (index !== -1) {
-            // Update existing
             services.value[index] = {
               ...services.value[index],
               overallStatus: payload.data.overallStatus,
@@ -51,9 +61,27 @@ export function useNexus() {
               checkerSummary
             };
           } else {
-            // If it's a new service we didn't have, we might need a full refresh 
-            // since snapshot doesn't have names. Let's just trigger fetch.
             fetchInitialState();
+          }
+        } else if (payload.type === 'server_update') {
+          const index = servers.value.findIndex(s => s.serverId === payload.data.serverId);
+          if (index !== -1) {
+            servers.value[index] = {
+              ...servers.value[index],
+              status: payload.data.status,
+              cpuPercent: payload.data.cpuPercent,
+              ramPercent: payload.data.ramPercent,
+              diskPercent: payload.data.diskPercent,
+              uptimeSeconds: payload.data.uptimeSeconds,
+              lastCheckedAt: payload.data.lastCheckedAt
+            };
+          } else {
+            fetchInitialServers();
+          }
+        } else if (payload.type === 'initial_server_state') {
+          // Merge server snapshot data with names
+          if (Array.isArray(payload.data)) {
+            fetchInitialServers();
           }
         }
       } catch (e) {
@@ -70,6 +98,7 @@ export function useNexus() {
 
   onMounted(() => {
     fetchInitialState();
+    fetchInitialServers();
     if (!ws) {
       initWebSocket();
     }
@@ -84,6 +113,7 @@ export function useNexus() {
 
   return {
     services,
+    servers,
     isConnected
   };
 }

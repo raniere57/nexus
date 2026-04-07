@@ -64,20 +64,64 @@
         </div>
       </div>
     </div>
+
+    <!-- Servers Section -->
+    <div class="list-header" style="margin-top: 4rem;">
+      <div class="header-info">
+        <h1>Infrastructure <span class="dim">Servers</span></h1>
+        <p class="description">Monitored servers via SSH.</p>
+      </div>
+      <router-link to="/config/servers/new" class="btn btn-primary">
+        + New Server
+      </router-link>
+    </div>
+
+    <div v-if="serversList.length === 0" class="empty-state">
+      <p>No servers configured yet.</p>
+    </div>
+
+    <div v-else class="services-grid">
+      <div 
+        v-for="srv in serversList" 
+        :key="srv.id" 
+        class="service-card"
+        @click="goToServerEdit(srv.id)"
+      >
+        <div class="card-status" :class="'card-status-' + getServerLiveStatus(srv.id)"></div>
+        <div class="card-body">
+          <div class="card-meta">
+            <span class="badge badge-dim">SSH</span>
+            <span class="badge">{{ srv.host }}</span>
+          </div>
+          <h3 class="card-title">{{ srv.name }}</h3>
+          <p class="card-description">{{ srv.sshUser }}@{{ srv.host }}:{{ srv.sshPort }}</p>
+          <div class="card-footer">
+            <div class="checkers-count">
+              <span class="label">Interval:</span>
+              <span class="value">{{ srv.checkIntervalSeconds }}s</span>
+            </div>
+            <div v-if="srv.isActive" class="active-badge">Active</div>
+            <div v-else class="inactive-badge">Paused</div>
+            <button class="btn-delete" @click.stop="deleteServerById(srv.id)">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { servicesApi, checkersApi, monitoringApi } from '../../services/api';
+import { servicesApi, checkersApi, monitoringApi, serversApi } from '../../services/api';
 import { useNexus } from '../../composables/useNexus';
-import type { Service, Checker, ServiceSnapshot } from '../../types';
+import type { Service, Server, ServiceSnapshot } from '../../types';
 
 const router = useRouter();
-const { services: liveServices } = useNexus();
+const { services: liveServices, servers: liveServers } = useNexus();
 
 const services = ref<Service[]>([]);
+const serversList = ref<Server[]>([]);
 const checkersMap = ref<Record<string, number>>({});
 const snapshots = ref<ServiceSnapshot[]>([]);
 const loading = ref(true);
@@ -101,14 +145,15 @@ const filteredServices = computed(() => {
 const fetchAll = async () => {
   try {
     loading.value = true;
-    const [svs, snps] = await Promise.all([
+    const [svs, snps, srvs] = await Promise.all([
       servicesApi.getAll(),
-      monitoringApi.getServiceStatus()
+      monitoringApi.getServiceStatus(),
+      serversApi.getAll()
     ]);
     services.value = svs;
     snapshots.value = snps;
+    serversList.value = srvs;
 
-    // Fetch checker counts for each service
     for (const s of svs) {
       const chks = await checkersApi.getByServiceId(s.id);
       checkersMap.value[s.id] = chks.length;
@@ -127,10 +172,29 @@ const getLiveStatus = (id: string) => {
   return snap?.overallStatus || 'unknown';
 };
 
+const getServerLiveStatus = (id: string) => {
+  const live = liveServers.value.find(ls => ls.serverId === id);
+  return live?.status || 'unknown';
+};
+
 const getCheckersCount = (id: string) => checkersMap.value[id] || 0;
 
 const goToDetail = (id: string) => {
   router.push(`/config/services/${id}`);
+};
+
+const goToServerEdit = (id: string) => {
+  router.push(`/config/servers/${id}`);
+};
+
+const deleteServerById = async (id: string) => {
+  if (!confirm('Tem certeza que deseja remover este servidor?')) return;
+  try {
+    await serversApi.delete(id);
+    serversList.value = serversList.value.filter(s => s.id !== id);
+  } catch (e) {
+    console.error('Failed to delete server', e);
+  }
 };
 
 onMounted(fetchAll);
@@ -351,5 +415,23 @@ onMounted(fetchAll);
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.btn-delete {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-offline);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 </style>

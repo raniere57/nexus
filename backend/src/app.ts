@@ -5,8 +5,10 @@ import { servicesRoutes } from './modules/services/routes.js';
 import { checkersRoutes } from './modules/checkers/routes.js';
 import { monitoringRoutes } from './modules/monitoring/routes.js';
 import { authRoutes } from './modules/auth/routes.js';
+import { serversRoutes } from './modules/servers/routes.js';
 import { addSubscriber, removeSubscriber } from './modules/realtime/websocket.js';
 import { getServiceSnapshots } from './modules/services/repository.js';
+import { getAllServerSnapshots } from './modules/servers/repository.js';
 
 export const app = new Elysia()
   .use(cors())
@@ -63,6 +65,12 @@ export const app = new Elysia()
           type: 'initial_state',
           data: snapshots
         }));
+        // Also send initial server states
+        const serverSnaps = getAllServerSnapshots();
+        ws.send(JSON.stringify({
+          type: 'initial_server_state',
+          data: serverSnaps
+        }));
       } catch (e) {
         console.error('[WebSocket] Failed to send initial state', e);
       }
@@ -75,4 +83,5 @@ export const app = new Elysia()
   .use(servicesRoutes)
   .use(checkersRoutes)
   .use(monitoringRoutes)
-  .use(authRoutes);
+  .use(authRoutes)
+  .use(serversRoutes);

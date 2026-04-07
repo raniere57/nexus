@@ -24,6 +24,16 @@ const routes: RouteRecordRaw[] = [
         path: 'services/:id',
         name: 'config-service-detail',
         component: () => import('../views/config/ServiceDetail.vue')
+      },
+      {
+        path: 'servers/new',
+        name: 'config-server-new',
+        component: () => import('../views/config/ServerForm.vue')
+      },
+      {
+        path: 'servers/:id',
+        name: 'config-server-edit',
+        component: () => import('../views/config/ServerForm.vue')
       }
     ]
   }

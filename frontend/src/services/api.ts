@@ -1,4 +1,4 @@
-import type { Checker, Service, CheckerResult, ServiceSnapshot } from '../types';
+import type { Checker, Service, Server, CheckerResult, ServiceSnapshot } from '../types';
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -84,3 +84,23 @@ export const monitoringApi = {
     return fetch(url).then(res => handleResponse<CheckerResult[]>(res));
   }
 };
+
+export const serversApi = {
+  getAll: () => fetch('/api/servers').then(res => handleResponse<Server[]>(res)),
+  getStatus: () => fetch('/api/servers/status').then(res => handleResponse<any[]>(res)),
+  getById: (id: string) => fetch(`/api/servers/${id}`).then(res => handleResponse<Server>(res)),
+  create: (data: Partial<Server>) => fetch('/api/servers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(res => handleResponse<Server>(res)),
+  update: (id: string, data: Partial<Server>) => fetch(`/api/servers/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(res => handleResponse<Server>(res)),
+  delete: (id: string) => fetch(`/api/servers/${id}`, {
+    method: 'DELETE'
+  }).then(res => handleResponse<{ success: boolean }>(res))
+};
+
