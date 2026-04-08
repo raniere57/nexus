@@ -105,23 +105,25 @@ const { nodes: staticNodes, lines: staticLines } = generateMesh();
 .mesh-line {
   stroke: rgba(14, 165, 233, 0.15);
   stroke-width: 0.5;
-  animation: slowPulse 12s infinite ease-in-out;
+  animation: slowPulse 4s infinite ease-in-out;
+  will-change: opacity, stroke-width;
 }
 
 .mesh-node {
   fill: var(--color-accent);
   opacity: 0.2;
-  animation: nodeBlink 8s infinite ease-in-out;
+  animation: nodeBlink 3s infinite ease-in-out;
+  will-change: opacity;
 }
 
 @keyframes slowPulse {
-  0%, 100% { opacity: 0.2; stroke-width: 0.5; }
-  50% { opacity: 0.6; stroke-width: 0.8; }
+  0%, 100% { opacity: 0.15; stroke-width: 0.5; }
+  50% { opacity: 0.5; stroke-width: 1.2; }
 }
 
 @keyframes nodeBlink {
-  0%, 100% { opacity: 0.1; }
-  50% { opacity: 0.8; }
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.9; }
 }
 
 .vignette {

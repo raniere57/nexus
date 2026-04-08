@@ -1,6 +1,10 @@
 <template>
-  <div class="nexus-app tv-mode">
-    <BackgroundCanvas />
+  <div class="nexus-app tv-mode" :class="{ 'critical-alert-active': hasCriticalAlerts }">
+    <!-- Dynamic performance component -->
+    <component :is="isTvMode ? TVPerformanceBackground : BackgroundCanvas" />
+    
+    <!-- Red overlay that pulses on failure -->
+    <div v-show="hasCriticalAlerts" class="global-alert-overlay"></div>
     
     <header class="nexus-header">
       <div class="header-content">
@@ -50,6 +54,11 @@ const systemStatusText = computed(() => {
   if (servers.value.some(s => s.status === 'offline')) return 'CRITICAL';
   if (services.value.some(s => s.overallStatus === 'degraded')) return 'DEGRADED';
   return 'ONLINE';
+});
+
+const hasCriticalAlerts = computed(() => {
+  return services.value.some(s => s.overallStatus === 'offline') || 
+         servers.value.some(s => s.status === 'offline');
 });
 
 const updateTime = () => {
@@ -173,8 +182,43 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
   border-left: 1px solid var(--border-subtle);
-  background: linear-gradient(to right, transparent, rgba(12, 16, 24, 0.9) 20%);
+  background: linear-gradient(to right, transparent, rgba(12, 16, 24, 0.95) 20%);
   display: flex;
   flex-direction: column;
+}
+
+/* Global Alert Effects */
+.global-alert-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(circle at center, transparent 30%, rgba(239, 68, 68, 0.15) 100%);
+  animation: globalAlertPulse 2s infinite ease-in-out;
+  will-change: opacity;
+}
+
+@keyframes globalAlertPulse {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+.critical-alert-active .header-status .status-indicator {
+  background: var(--color-offline);
+  box-shadow: 0 0 20px var(--color-offline);
+}
+
+.critical-alert-active .header-status span:last-child {
+  color: var(--color-offline);
+  font-weight: 700;
+  animation: textBlink 1s infinite alternate;
+}
+
+@keyframes textBlink {
+  from { opacity: 1; }
+  to { opacity: 0.5; }
 }
 </style>
