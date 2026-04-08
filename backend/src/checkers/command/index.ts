@@ -1,390 +1,330 @@
-import type { Checker, CheckerResult, Server } from '../../shared/types';
+import type { Checker, CheckerResult } from '../../shared/types';
 import crypto from 'crypto';
-import { checkServerViaSSH } from '../ssh/index';
 import { getServerById } from '../../modules/servers/repository';
 
-interface CommandCheckerConfig {
-  command: string;
-  /**
-   * String to search in stdout/stderr to determine success.
-   * If not provided, only exit code is checked (0 = success).
-   */
+// =====================================================================
+// Preset Checker Types
+// The user picks a preset, fills simple fields, and the backend
+// builds and executes the correct command automatically.
+// =====================================================================
+
+export type PresetType = 
+  | 'curl'        // curl -sSf <url>
+  | 'systemctl'   // systemctl is-active <service>
+  | 'tcp_port'    // nc -zw3 <host> <port>
+  | 'dns'         // dig +short <domain>
+  | 'process'     // pgrep -x <process>
+  | 'custom';     // raw shell command (advanced)
+
+export interface CommandCheckerConfig {
+  // --- Common ---
+  preset: PresetType;
+  serverId?: string;       // If set, run via SSH on this server
+  timeoutSeconds?: number;
+
+  // --- Curl ---
+  url?: string;
+
+  // --- Systemctl ---
+  serviceName?: string;
+
+  // --- TCP Port ---
+  host?: string;
+  port?: number;
+
+  // --- DNS ---
+  domain?: string;
+  dnsType?: string;       // A, AAAA, MX, CNAME, TXT
+
+  // --- Process ---
+  processName?: string;
+
+  // --- Custom (raw) ---
+  command?: string;
   successPattern?: string;
-  /**
-   * Whether to check stdout only (true) or both stdout + stderr (false).
-   * Default: false (checks both)
-   */
   stdoutOnly?: boolean;
-  /**
-   * Whether the successPattern should match exactly (true) or contain (false).
-   * Default: false (contains)
-   */
   exactMatch?: boolean;
-  /**
-   * Optional server ID to execute this command remotely via SSH.
-   * If provided, the command will run on the remote server instead of locally.
-   */
-  serverId?: string;
 }
 
 /**
- * Execute a local shell command to check service availability.
- * The exit code 0 means success by default.
- * You can also specify a successPattern to check in the output.
- * If serverId is provided in config, the command will run on the remote server via SSH.
+ * Build the shell command string from a config preset.
+ * This is the core abstraction — the user fills simple fields 
+ * and the backend builds the actual shell command.
+ */
+export function buildCommandFromPreset(config: CommandCheckerConfig): { command: string; successPattern?: string } {
+  switch (config.preset) {
+    case 'curl':
+      if (!config.url) throw new Error('curl preset requires a url');
+      return {
+        command: `curl -sSf --max-time 10 "${config.url}"`
+      };
+
+    case 'systemctl':
+      if (!config.serviceName) throw new Error('systemctl preset requires a serviceName');
+      return {
+        command: `systemctl is-active "${config.serviceName}"`,
+        successPattern: 'active'
+      };
+
+    case 'tcp_port':
+      if (!config.host || !config.port) throw new Error('tcp_port preset requires host and port');
+      return {
+        command: `nc -zw3 "${config.host}" ${config.port}`
+      };
+
+    case 'dns': {
+      if (!config.domain) throw new Error('dns preset requires a domain');
+      const dnsType = config.dnsType || 'A';
+      return {
+        command: `dig +short "${config.domain}" ${dnsType}`,
+        successPattern: undefined // Just check exit code 0
+      };
+    }
+
+    case 'process':
+      if (!config.processName) throw new Error('process preset requires a processName');
+      return {
+        command: `pgrep -x "${config.processName}"`
+      };
+
+    case 'custom':
+      if (!config.command) throw new Error('custom preset requires a command');
+      return {
+        command: config.command,
+        successPattern: config.successPattern
+      };
+
+    default:
+      throw new Error(`Unknown preset: ${config.preset}`);
+  }
+}
+
+/**
+ * Main entry point: Execute a command checker.
+ * Handles both local and SSH (remote server) execution.
  */
 export async function executeCommandChecker(checker: Checker, timeoutSeconds: number): Promise<CheckerResult> {
   const startTime = Date.now();
-  let config: CommandCheckerConfig = { command: '' };
+  let config: CommandCheckerConfig = { preset: 'custom', command: '' };
 
   try {
     config = JSON.parse(checker.configJson);
   } catch (e) {
-    return {
-      id: crypto.randomUUID(),
-      serviceId: checker.serviceId,
-      checkerId: checker.id,
-      status: 'error',
-      responseTimeMs: 0,
-      statusCode: null,
-      errorMessage: 'Invalid JSON config for command checker',
-      checkedAt: new Date().toISOString()
-    };
+    return makeError(checker, startTime, 'Invalid JSON config for command checker');
   }
 
-  if (!config.command) {
-    return {
-      id: crypto.randomUUID(),
-      serviceId: checker.serviceId,
-      checkerId: checker.id,
-      status: 'error',
-      responseTimeMs: 0,
-      statusCode: null,
-      errorMessage: 'No command specified',
-      checkedAt: new Date().toISOString()
-    };
+  // Backward compat: if no preset field but has 'command', treat as custom
+  if (!config.preset && (config as any).command) {
+    config.preset = 'custom';
   }
 
-  // If serverId is provided, execute command via SSH on remote server
+  if (!config.preset) {
+    return makeError(checker, startTime, 'No preset specified in checker config');
+  }
+
+  let builtCommand: string;
+  let successPattern: string | undefined;
+
+  try {
+    const built = buildCommandFromPreset(config);
+    builtCommand = built.command;
+    successPattern = config.successPattern || built.successPattern;
+  } catch (e: any) {
+    return makeError(checker, startTime, e.message);
+  }
+
+  const effectiveTimeout = config.timeoutSeconds || timeoutSeconds;
+
   if (config.serverId) {
-    return await executeCommandViaSSH(checker, config, timeoutSeconds, startTime);
+    return executeViaSSH(checker, builtCommand, successPattern, config, effectiveTimeout, startTime);
   }
-
-  // Otherwise, execute locally
-  return await executeCommandLocal(checker, config, timeoutSeconds, startTime);
+  return executeLocal(checker, builtCommand, successPattern, config, effectiveTimeout, startTime);
 }
 
-/**
- * Execute command locally via shell spawn
- */
-async function executeCommandLocal(
+// =====================================================================
+// Local Execution
+// =====================================================================
+async function executeLocal(
   checker: Checker,
+  command: string,
+  successPattern: string | undefined,
   config: CommandCheckerConfig,
   timeoutSeconds: number,
   startTime: number
 ): Promise<CheckerResult> {
-
   try {
-    // We use a shell to wrap the command for convenience (pipes, etc)
-    const proc = Bun.spawn(['sh', '-c', config.command], {
+    const proc = Bun.spawn(['sh', '-c', command], {
       stdout: 'pipe',
       stderr: 'pipe'
     });
 
     const exitCodePromise = proc.exited;
-
-    // Timeout logic
-    const timeoutPromise = new Promise<number>((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout')), timeoutSeconds * 1000);
-    });
+    const timeoutPromise = new Promise<number>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), timeoutSeconds * 1000)
+    );
 
     try {
       const exitCode = await Promise.race([exitCodePromise, timeoutPromise]);
-      const endTime = Date.now();
-      const responseTimeMs = endTime - startTime;
+      const responseTimeMs = Date.now() - startTime;
 
-      if (exitCode === 0) {
-        // If no successPattern is defined, exit code 0 is enough
-        if (!config.successPattern) {
-          return {
-            id: crypto.randomUUID(),
-            serviceId: checker.serviceId,
-            checkerId: checker.id,
-            status: 'success',
-            responseTimeMs,
-            statusCode: 0,
-            errorMessage: null,
-            checkedAt: new Date().toISOString()
-          };
-        }
+      const stdout = await new Response(proc.stdout).text();
+      const stderr = await new Response(proc.stderr).text();
 
-        // If successPattern is defined, check the output
-        const stdout = await new Response(proc.stdout).text();
-        const stderr = await new Response(proc.stderr).text();
-        const output = config.stdoutOnly ? stdout : stdout + stderr;
-
-        const matches = config.exactMatch
-          ? output.trim() === config.successPattern
-          : output.includes(config.successPattern);
-
-        if (matches) {
-          return {
-            id: crypto.randomUUID(),
-            serviceId: checker.serviceId,
-            checkerId: checker.id,
-            status: 'success',
-            responseTimeMs,
-            statusCode: 0,
-            errorMessage: null,
-            checkedAt: new Date().toISOString()
-          };
-        } else {
-          return {
-            id: crypto.randomUUID(),
-            serviceId: checker.serviceId,
-            checkerId: checker.id,
-            status: 'failure',
-            responseTimeMs,
-            statusCode: exitCode,
-            errorMessage: `Output does not contain expected pattern: "${config.successPattern}"`,
-            checkedAt: new Date().toISOString()
-          };
-        }
-      } else {
-        // Non-zero exit code - check if we should consider it a failure anyway
-        const stderr = await new Response(proc.stderr).text();
-        const stdout = await new Response(proc.stdout).text();
-
-        // If successPattern is defined and we got a non-zero exit,
-        // we still check if the output matches (some commands return non-zero but succeed)
-        if (config.successPattern) {
-          const output = config.stdoutOnly ? stdout : stdout + stderr;
-          const matches = config.exactMatch
-            ? output.trim() === config.successPattern
-            : output.includes(config.successPattern);
-
-          if (matches) {
-            return {
-              id: crypto.randomUUID(),
-              serviceId: checker.serviceId,
-              checkerId: checker.id,
-              status: 'success',
-              responseTimeMs,
-              statusCode: exitCode,
-              errorMessage: null,
-              checkedAt: new Date().toISOString()
-            };
-          }
-        }
-
-        // It's a failure
-        return {
-          id: crypto.randomUUID(),
-          serviceId: checker.serviceId,
-          checkerId: checker.id,
-          status: 'failure',
-          responseTimeMs,
-          statusCode: exitCode,
-          errorMessage: stderr.trim() || stdout.trim() || `Exit code: ${exitCode}`,
-          checkedAt: new Date().toISOString()
-        };
-      }
+      return evaluateResult(checker, exitCode, stdout, stderr, successPattern, config, responseTimeMs);
     } catch (err: any) {
-      // Handle timeout
       proc.kill();
-      return {
-        id: crypto.randomUUID(),
-        serviceId: checker.serviceId,
-        checkerId: checker.id,
-        status: 'timeout',
-        responseTimeMs: Date.now() - startTime,
-        statusCode: null,
-        errorMessage: 'Execution timeout',
-        checkedAt: new Date().toISOString()
-      };
+      return makeTimeout(checker, startTime);
     }
   } catch (err: any) {
-    return {
-      id: crypto.randomUUID(),
-      serviceId: checker.serviceId,
-      checkerId: checker.id,
-      status: 'error',
-      responseTimeMs: Date.now() - startTime,
-      statusCode: null,
-      errorMessage: err.message || 'Spawn failure',
-      checkedAt: new Date().toISOString()
-    };
+    return makeError(checker, startTime, err.message || 'Spawn failure');
   }
 }
 
-/**
- * Execute command via SSH on remote server
- */
-async function executeCommandViaSSH(
+// =====================================================================
+// SSH Remote Execution
+// =====================================================================
+async function executeViaSSH(
   checker: Checker,
+  command: string,
+  successPattern: string | undefined,
   config: CommandCheckerConfig,
   timeoutSeconds: number,
   startTime: number
 ): Promise<CheckerResult> {
   const server = getServerById(config.serverId!);
-
   if (!server) {
-    return {
-      id: crypto.randomUUID(),
-      serviceId: checker.serviceId,
-      checkerId: checker.id,
-      status: 'error',
-      responseTimeMs: Date.now() - startTime,
-      statusCode: null,
-      errorMessage: `Server not found: ${config.serverId}`,
-      checkedAt: new Date().toISOString()
-    };
+    return makeError(checker, startTime, `Server not found: ${config.serverId}`);
   }
 
-  // Escape the command for shell execution
-  const escapedCommand = config.command.replace(/'/g, "'\"'\"'");
-  const remoteScript = `cd /tmp && ${escapedCommand}`;
-
   const sshArgs = [
-    'sshpass', '-e',
     'ssh',
     '-o', `ConnectTimeout=${timeoutSeconds}`,
     '-o', 'StrictHostKeyChecking=no',
+    '-o', 'BatchMode=no',
     '-o', 'PubkeyAuthentication=no',
     '-o', 'PreferredAuthentications=password',
-    '-p', String(server.sshPort),
-    `${server.sshUser}@${server.host}`,
-    remoteScript
+    '-p', String(server.sshPort || 22),
+    `${server.sshUser || 'root'}@${server.host}`,
+    command
   ];
 
+  // Use sshpass if available, else try direct (key-based)
+  const usesSshpass = server.sshPassword && server.sshPassword.length > 0;
+  const finalArgs = usesSshpass ? ['sshpass', '-e', ...sshArgs] : sshArgs;
+  const env = usesSshpass ? { ...process.env, SSHPASS: server.sshPassword } : process.env;
+
   try {
-    const proc = Bun.spawn(sshArgs, {
+    const proc = Bun.spawn(finalArgs, {
       stdout: 'pipe',
       stderr: 'pipe',
-      env: {
-        ...process.env,
-        SSHPASS: server.sshPassword
-      }
+      env: env as Record<string, string>
     });
 
     const exitCodePromise = proc.exited;
-
-    // Timeout logic
-    const timeoutPromise = new Promise<number>((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout')), timeoutSeconds * 1000);
-    });
+    const timeoutPromise = new Promise<number>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), timeoutSeconds * 1000)
+    );
 
     try {
       const exitCode = await Promise.race([exitCodePromise, timeoutPromise]);
-      const endTime = Date.now();
-      const responseTimeMs = endTime - startTime;
+      const responseTimeMs = Date.now() - startTime;
 
-      if (exitCode === 0) {
-        // If no successPattern is defined, exit code 0 is enough
-        if (!config.successPattern) {
-          return {
-            id: crypto.randomUUID(),
-            serviceId: checker.serviceId,
-            checkerId: checker.id,
-            status: 'success',
-            responseTimeMs,
-            statusCode: 0,
-            errorMessage: null,
-            checkedAt: new Date().toISOString()
-          };
-        }
+      const stdout = await new Response(proc.stdout).text();
+      const stderr = await new Response(proc.stderr).text();
 
-        // If successPattern is defined, check the output
-        const stdout = await new Response(proc.stdout).text();
-        const stderr = await new Response(proc.stderr).text();
-        const output = config.stdoutOnly ? stdout : stdout + stderr;
-
-        const matches = config.exactMatch
-          ? output.trim() === config.successPattern
-          : output.includes(config.successPattern);
-
-        if (matches) {
-          return {
-            id: crypto.randomUUID(),
-            serviceId: checker.serviceId,
-            checkerId: checker.id,
-            status: 'success',
-            responseTimeMs,
-            statusCode: 0,
-            errorMessage: null,
-            checkedAt: new Date().toISOString()
-          };
-        } else {
-          return {
-            id: crypto.randomUUID(),
-            serviceId: checker.serviceId,
-            checkerId: checker.id,
-            status: 'failure',
-            responseTimeMs,
-            statusCode: exitCode,
-            errorMessage: `Output does not contain expected pattern: "${config.successPattern}"`,
-            checkedAt: new Date().toISOString()
-          };
-        }
-      } else {
-        // Non-zero exit code
-        const stderr = await new Response(proc.stderr).text();
-        const stdout = await new Response(proc.stdout).text();
-
-        if (config.successPattern) {
-          const output = config.stdoutOnly ? stdout : stdout + stderr;
-          const matches = config.exactMatch
-            ? output.trim() === config.successPattern
-            : output.includes(config.successPattern);
-
-          if (matches) {
-            return {
-              id: crypto.randomUUID(),
-              serviceId: checker.serviceId,
-              checkerId: checker.id,
-              status: 'success',
-              responseTimeMs,
-              statusCode: exitCode,
-              errorMessage: null,
-              checkedAt: new Date().toISOString()
-            };
-          }
-        }
-
-        return {
-          id: crypto.randomUUID(),
-          serviceId: checker.serviceId,
-          checkerId: checker.id,
-          status: 'failure',
-          responseTimeMs,
-          statusCode: exitCode,
-          errorMessage: stderr.trim() || stdout.trim() || `Exit code: ${exitCode}`,
-          checkedAt: new Date().toISOString()
-        };
-      }
+      return evaluateResult(checker, exitCode, stdout, stderr, successPattern, config, responseTimeMs);
     } catch (err: any) {
       proc.kill();
-      return {
-        id: crypto.randomUUID(),
-        serviceId: checker.serviceId,
-        checkerId: checker.id,
-        status: 'timeout',
-        responseTimeMs: Date.now() - startTime,
-        statusCode: null,
-        errorMessage: 'SSH execution timeout',
-        checkedAt: new Date().toISOString()
-      };
+      return makeTimeout(checker, startTime);
     }
   } catch (err: any) {
+    return makeError(checker, startTime, err.message || 'SSH spawn failure');
+  }
+}
+
+// =====================================================================
+// Result Evaluation
+// =====================================================================
+function evaluateResult(
+  checker: Checker,
+  exitCode: number,
+  stdout: string,
+  stderr: string,
+  successPattern: string | undefined,
+  config: CommandCheckerConfig,
+  responseTimeMs: number
+): CheckerResult {
+  const output = config.stdoutOnly ? stdout : stdout + stderr;
+
+  // If there's a success pattern, output must match regardless of exit code
+  if (successPattern) {
+    const matches = config.exactMatch
+      ? output.trim() === successPattern
+      : output.includes(successPattern);
+    
     return {
       id: crypto.randomUUID(),
       serviceId: checker.serviceId,
       checkerId: checker.id,
-      status: 'error',
-      responseTimeMs: Date.now() - startTime,
-      statusCode: null,
-      errorMessage: err.message || 'SSH spawn failure',
+      status: matches ? 'success' : 'failure',
+      responseTimeMs,
+      statusCode: exitCode,
+      errorMessage: matches ? null : `Output did not contain: "${successPattern}". Got: ${output.trim().slice(0, 200)}`,
       checkedAt: new Date().toISOString()
     };
   }
+
+  // No pattern: just check exit code
+  if (exitCode === 0) {
+    return {
+      id: crypto.randomUUID(),
+      serviceId: checker.serviceId,
+      checkerId: checker.id,
+      status: 'success',
+      responseTimeMs,
+      statusCode: 0,
+      errorMessage: null,
+      checkedAt: new Date().toISOString()
+    };
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    serviceId: checker.serviceId,
+    checkerId: checker.id,
+    status: 'failure',
+    responseTimeMs,
+    statusCode: exitCode,
+    errorMessage: stderr.trim() || stdout.trim() || `Exit code: ${exitCode}`,
+    checkedAt: new Date().toISOString()
+  };
+}
+
+// =====================================================================
+// Helpers
+// =====================================================================
+function makeError(checker: Checker, startTime: number, message: string): CheckerResult {
+  return {
+    id: crypto.randomUUID(),
+    serviceId: checker.serviceId,
+    checkerId: checker.id,
+    status: 'error',
+    responseTimeMs: Date.now() - startTime,
+    statusCode: null,
+    errorMessage: message,
+    checkedAt: new Date().toISOString()
+  };
+}
+
+function makeTimeout(checker: Checker, startTime: number): CheckerResult {
+  return {
+    id: crypto.randomUUID(),
+    serviceId: checker.serviceId,
+    checkerId: checker.id,
+    status: 'timeout',
+    responseTimeMs: Date.now() - startTime,
+    statusCode: null,
+    errorMessage: 'Execution timeout',
+    checkedAt: new Date().toISOString()
+  };
 }

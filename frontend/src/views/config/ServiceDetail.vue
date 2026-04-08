@@ -165,19 +165,11 @@
         </div>
 
         <form @submit.prevent="handleSaveChecker">
-          <div class="form-group">
-            <label>Checker Name</label>
-            <input v-model="checkerModal.form.name" type="text" placeholder="e.g. Health Endpoint" required />
-          </div>
-
+          <!-- Name + Active -->
           <div class="form-row">
-            <div class="form-group half">
-              <label>Type</label>
-              <select v-model="checkerModal.form.type" required :disabled="checkerModal.isEdit" @change="handleTypeChange">
-                <option value="http">HTTP Fetch</option>
-                <option value="ping">System Ping</option>
-                <option value="command">Script / Command</option>
-              </select>
+            <div class="form-group" style="flex:2">
+              <label>Checker Name</label>
+              <input v-model="checkerModal.form.name" type="text" placeholder="e.g. Health Endpoint" required />
             </div>
             <div class="form-group half">
               <label>Active</label>
@@ -188,21 +180,56 @@
             </div>
           </div>
 
+          <!-- Checker Type (top-level: http, ping, command) + Preset -->
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Method</label>
+              <select v-model="checkerModal.form.type" required :disabled="checkerModal.isEdit" @change="handleTypeChange">
+                <option value="http">HTTP Fetch</option>
+                <option value="ping">Ping</option>
+                <option value="command">Command / Preset</option>
+              </select>
+            </div>
+            <div class="form-group half" v-if="checkerModal.form.type === 'command'">
+              <label>Preset</label>
+              <select v-model="checkerModal.config.preset" @change="handlePresetChange">
+                <option value="curl">🌐 cURL</option>
+                <option value="systemctl">⚙️ systemctl</option>
+                <option value="tcp_port">🔌 TCP Port</option>
+                <option value="dns">🔍 DNS Lookup</option>
+                <option value="process">📋 Process Check</option>
+                <option value="custom">🖥️ Custom Command</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Preset Info Banner -->
+          <div class="preset-info" v-if="checkerModal.form.type === 'command' && currentPresetInfo">
+            <span class="preset-info-icon">{{ currentPresetInfo.icon }}</span>
+            <div>
+              <strong>{{ currentPresetInfo.title }}</strong>
+              <p>{{ currentPresetInfo.description }}</p>
+            </div>
+          </div>
+
           <!-- Dynamic Config Fields -->
           <div class="config-fields">
+
+            <!-- HTTP -->
             <div v-if="checkerModal.form.type === 'http'" class="config-section">
-              <div class="form-group">
-                <label>HTTP Method</label>
-                <select v-model="checkerModal.config.method">
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="HEAD">HEAD</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>URL (Full or Path)</label>
-                <input v-model="checkerModal.config.url" type="text" placeholder="e.g. /health or https://api.svc.com" required />
-                <small>If path starts with /, it appends to service Base URL.</small>
+              <div class="form-row">
+                <div class="form-group" style="width:120px">
+                  <label>Method</label>
+                  <select v-model="checkerModal.config.method">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="HEAD">HEAD</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex:1">
+                  <label>URL</label>
+                  <input v-model="checkerModal.config.url" type="text" placeholder="https://api.example.com/health or /health" required />
+                </div>
               </div>
               <div class="form-row">
                 <div class="form-group half">
@@ -210,69 +237,143 @@
                   <input v-model.number="checkerModal.config.expectedStatus" type="number" placeholder="200" />
                 </div>
                 <div class="form-group half">
-                  <label>Timeout Overwrite</label>
+                  <label>Timeout (s)</label>
                   <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
                 </div>
               </div>
+              <small class="field-hint">If URL starts with <code>/</code>, it's appended to the service Base URL.</small>
             </div>
 
+            <!-- PING -->
             <div v-if="checkerModal.form.type === 'ping'" class="config-section">
               <div class="form-group">
-                <label>Ping Host</label>
-                <input v-model="checkerModal.config.host" type="text" placeholder="e.g. 10.0.0.1 or service.local" />
-                <small>If empty, uses service default host.</small>
-              </div>
-              <div class="form-group">
-                <label>Timeout Overwrite</label>
-                <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
+                <label>Host</label>
+                <input v-model="checkerModal.config.host" type="text" placeholder="e.g. 10.0.0.1 or myserver.local" />
+                <small class="field-hint">Leave empty to use the service's default host.</small>
               </div>
             </div>
 
+            <!-- COMMAND / PRESETS -->
             <div v-if="checkerModal.form.type === 'command'" class="config-section">
-              <div class="form-group">
-                <label>Shell Command</label>
-                <input v-model="checkerModal.config.command" type="text" placeholder="e.g. systemctl status nginx.service" required />
-                <small>Command to execute. Exit code 0 = SUCCESS.</small>
-              </div>
-              <div class="form-group">
-                <label>Target Server (optional)</label>
-                <select v-model="checkerModal.config.serverId" :disabled="servers.length === 0">
-                  <option value="">Local (Backend Server)</option>
-                  <option v-for="server in servers" :key="server.id" :value="server.id">
-                    {{ server.name }} ({{ server.host }})
-                  </option>
-                </select>
-                <small v-if="servers.length === 0">No servers configured. Commands will run locally.</small>
-                <small v-else>Select a server to run this command remotely via SSH. Leave empty for local execution.</small>
-              </div>
-              <div class="form-group">
-                <label>Success Pattern (optional)</label>
-                <input v-model="checkerModal.config.successPattern" type="text" placeholder="e.g. active (running)" />
-                <small>If provided, output must contain this string for success.</small>
-              </div>
-              <div class="form-group">
-                <label>Timeout Overwrite</label>
-                <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
-              </div>
-            </div>
 
-            <!-- Command Checker Help Section -->
-            <div class="command-help" v-if="checkerModal.form.type === 'command'">
-              <h4>💡 Common systemctl Commands</h4>
-              <div class="command-example">
-                <strong>Check if service is running:</strong>
-                <code>systemctl is-active myservice.service</code>
-                <small>Success Pattern: <code>active</code></small>
-              </div>
-              <div class="command-example">
-                <strong>Check service status (detailed):</strong>
-                <code>systemctl status myservice.service</code>
-                <small>Success Pattern: <code>active (running)</code></small>
-              </div>
-              <div class="command-example">
-                <strong>Check if process is running:</strong>
-                <code>pgrep -x myprocess > /dev/null</code>
-                <small>Success Pattern: (leave empty)</small>
+              <!-- cURL -->
+              <template v-if="checkerModal.config.preset === 'curl'">
+                <div class="form-group">
+                  <label>URL to check</label>
+                  <input v-model="checkerModal.config.url" type="text" placeholder="http://172.17.0.1:9099" required />
+                  <small class="field-hint">Success = HTTP 2xx response. Failure = connection refused, timeout or 4xx/5xx.</small>
+                </div>
+                <div class="form-group">
+                  <label>Target Server (optional)</label>
+                  <select v-model="checkerModal.config.serverId">
+                    <option value="">Local (backend container)</option>
+                    <option v-for="s in servers" :key="s.id" :value="s.id">{{ s.name }} — {{ s.host }}</option>
+                  </select>
+                  <small class="field-hint">Choose a server to issue curl from there via SSH.</small>
+                </div>
+              </template>
+
+              <!-- systemctl -->
+              <template v-if="checkerModal.config.preset === 'systemctl'">
+                <div class="form-group">
+                  <label>Service Name</label>
+                  <input v-model="checkerModal.config.serviceName" type="text" placeholder="e.g. nginx or docker" required />
+                  <small class="field-hint">Runs <code>systemctl is-active &lt;service&gt;</code>. Succeeds if output is <code>active</code>.</small>
+                </div>
+                <div class="form-group">
+                  <label>Target Server <span class="required">*required</span></label>
+                  <select v-model="checkerModal.config.serverId" required>
+                    <option value="" disabled>— Select a server —</option>
+                    <option v-for="s in servers" :key="s.id" :value="s.id">{{ s.name }} — {{ s.host }}</option>
+                  </select>
+                  <small v-if="servers.length === 0" class="field-hint warn">⚠️ No servers configured. Add one in Servers config first.</small>
+                </div>
+              </template>
+
+              <!-- TCP Port -->
+              <template v-if="checkerModal.config.preset === 'tcp_port'">
+                <div class="form-row">
+                  <div class="form-group" style="flex:2">
+                    <label>Host</label>
+                    <input v-model="checkerModal.config.host" type="text" placeholder="e.g. 10.0.0.5 or db.internal" required />
+                  </div>
+                  <div class="form-group half">
+                    <label>Port</label>
+                    <input v-model.number="checkerModal.config.port" type="number" placeholder="e.g. 5432" required />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Run from Server (optional)</label>
+                  <select v-model="checkerModal.config.serverId">
+                    <option value="">Local (backend container)</option>
+                    <option v-for="s in servers" :key="s.id" :value="s.id">{{ s.name }} — {{ s.host }}</option>
+                  </select>
+                </div>
+                <small class="field-hint">Runs <code>nc -zw3 &lt;host&gt; &lt;port&gt;</code>. Succeeds if the port is open.</small>
+              </template>
+
+              <!-- DNS -->
+              <template v-if="checkerModal.config.preset === 'dns'">
+                <div class="form-row">
+                  <div class="form-group" style="flex:2">
+                    <label>Domain</label>
+                    <input v-model="checkerModal.config.domain" type="text" placeholder="e.g. api.myapp.com" required />
+                  </div>
+                  <div class="form-group half">
+                    <label>Record Type</label>
+                    <select v-model="checkerModal.config.dnsType">
+                      <option value="A">A</option>
+                      <option value="AAAA">AAAA</option>
+                      <option value="CNAME">CNAME</option>
+                      <option value="MX">MX</option>
+                      <option value="TXT">TXT</option>
+                    </select>
+                  </div>
+                </div>
+                <small class="field-hint">Runs <code>dig +short &lt;domain&gt;</code>. Succeeds if the domain resolves.</small>
+              </template>
+
+              <!-- Process -->
+              <template v-if="checkerModal.config.preset === 'process'">
+                <div class="form-group">
+                  <label>Process Name</label>
+                  <input v-model="checkerModal.config.processName" type="text" placeholder="e.g. nginx or bun" required />
+                  <small class="field-hint">Runs <code>pgrep -x &lt;name&gt;</code>. Succeeds if the process is running.</small>
+                </div>
+                <div class="form-group">
+                  <label>Target Server <span class="required">*required</span></label>
+                  <select v-model="checkerModal.config.serverId" required>
+                    <option value="" disabled>— Select a server —</option>
+                    <option v-for="s in servers" :key="s.id" :value="s.id">{{ s.name }} — {{ s.host }}</option>
+                  </select>
+                </div>
+              </template>
+
+              <!-- Custom -->
+              <template v-if="checkerModal.config.preset === 'custom'">
+                <div class="form-group">
+                  <label>Shell Command</label>
+                  <input v-model="checkerModal.config.command" type="text" placeholder="e.g. curl -sSf http://127.0.0.1:9099" required />
+                  <small class="field-hint">Exit code 0 = SUCCESS. You can also define a success pattern below.</small>
+                </div>
+                <div class="form-group">
+                  <label>Success Pattern (optional)</label>
+                  <input v-model="checkerModal.config.successPattern" type="text" placeholder="e.g. active (running)" />
+                  <small class="field-hint">If set, output must contain this string regardless of exit code.</small>
+                </div>
+                <div class="form-group">
+                  <label>Target Server (optional)</label>
+                  <select v-model="checkerModal.config.serverId">
+                    <option value="">Local (backend container)</option>
+                    <option v-for="s in servers" :key="s.id" :value="s.id">{{ s.name }} — {{ s.host }}</option>
+                  </select>
+                </div>
+              </template>
+
+              <!-- Timeout -->
+              <div class="form-group" style="max-width:160px">
+                <label>Timeout (s)</label>
+                <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
               </div>
             </div>
           </div>
@@ -282,7 +383,7 @@
           <div class="modal-actions-container">
             <div class="test-action">
               <button type="button" @click="handleTestChecker" class="btn btn-test" :disabled="checkerModal.loading || checkerModal.testing">
-                {{ checkerModal.testing ? 'Testing...' : 'Test Connection' }}
+                {{ checkerModal.testing ? 'Testing...' : '⚡ Test Now' }}
               </button>
             </div>
             <div class="main-actions">
@@ -303,7 +404,7 @@
               {{ checkerModal.testResult.errorMessage }}
             </div>
             <div v-else class="result-success">
-              Checker verified successfully.
+              ✅ Checker verified successfully.
             </div>
           </div>
         </form>
@@ -345,9 +446,7 @@ const checkerModal = reactive({
     type: 'http' as 'http' | 'ping' | 'command',
     isActive: true
   },
-  config: {
-    serverId: '' as string | null
-  } as any
+  config: {} as any
 });
 
 const serviceId = computed(() => route.params.id as string);
@@ -396,15 +495,24 @@ const fetchServers = async () => {
   }
 };
 
+const PRESET_INFO: Record<string, { icon: string; title: string; description: string }> = {
+  curl:      { icon: '🌐', title: 'cURL HTTP Check',  description: 'Executes curl -sSf <url>. Succeeds on 2xx. TIP: use 172.17.0.1 instead of localhost to reach the host from inside Docker.' },
+  systemctl: { icon: '⚙️', title: 'systemctl Check',  description: 'Runs systemctl is-active <service> via SSH. No manual command needed — just pick the server and type the service name.' },
+  tcp_port:  { icon: '🔌', title: 'TCP Port Check',   description: 'Tests if a TCP port is open with nc -zw3. Ideal for databases, Redis, AMQP and any raw TCP service.' },
+  dns:       { icon: '🔍', title: 'DNS Lookup',       description: 'Resolves a domain with dig +short. Succeeds if the domain resolves to at least one address.' },
+  process:   { icon: '📋', title: 'Process Check',    description: 'Checks if a process is running with pgrep -x on the target server.' },
+  custom:    { icon: '🖥️', title: 'Custom Command',   description: 'Run any shell command. Exit code 0 = success. Optionally define a success pattern to match in the output.' }
+};
+
+const currentPresetInfo = computed(() => {
+  if (checkerModal.form.type !== 'command') return null;
+  return PRESET_INFO[checkerModal.config.preset] || null;
+});
+
 const handleTypeChange = () => {
-  // Clear config except command if switching to command, or URL if switching to HTTP
   const newType = checkerModal.form.type;
-  const serverId = checkerModal.config.serverId || null; // Preserve serverId
   if (newType === 'command') {
-    checkerModal.config = {
-      command: (checkerModal.config.url && checkerModal.config.url.startsWith('curl')) ? checkerModal.config.url : '',
-      serverId
-    };
+    checkerModal.config = { preset: 'curl', url: '', serverId: '' };
   } else if (newType === 'http') {
     checkerModal.config = { method: 'GET', url: '', expectedStatus: 200 };
   } else {
@@ -412,33 +520,34 @@ const handleTypeChange = () => {
   }
 };
 
-const openCheckerModal = (checker: Checker | null) => {
+const handlePresetChange = () => {
+  const preset = checkerModal.config.preset;
+  const prevServer = checkerModal.config.serverId || '';
+  checkerModal.config = {
+    preset,
+    serverId: prevServer,
+    dnsType: preset === 'dns' ? 'A' : undefined
+  };
+};
+
+const openCheckerModal = (checker: any | null) => {
   checkerModal.show = true;
   checkerModal.isEdit = !!checker;
   checkerModal.checkerId = checker?.id || null;
   checkerModal.error = null;
+  checkerModal.testResult = null;
 
   if (checker) {
     const parsedConfig = JSON.parse(checker.configJson || '{}');
-    checkerModal.form = {
-      name: checker.name,
-      type: checker.type,
-      isActive: checker.isActive
-    };
+    checkerModal.form = { name: checker.name, type: checker.type, isActive: checker.isActive };
     checkerModal.config = { ...parsedConfig };
+    // Backward compat: old raw command checkers get mapped to 'custom' preset
+    if (checker.type === 'command' && !parsedConfig.preset) {
+      checkerModal.config.preset = 'custom';
+    }
   } else {
-    checkerModal.form = {
-      name: '',
-      type: 'http',
-      isActive: true
-    };
-    checkerModal.config = {
-      method: 'GET',
-      url: '',
-      expectedStatus: 200,
-      command: '', // For command type
-      serverId: servers.value.length > 0 ? servers.value[0].id : null
-    };
+    checkerModal.form = { name: '', type: 'http', isActive: true };
+    checkerModal.config = { method: 'GET', url: '', expectedStatus: 200 };
   }
 };
 
@@ -748,6 +857,66 @@ onMounted(() => {
   font-size: 0.8rem;
   color: #475569;
   font-family: var(--font-mono);
+}
+
+/* Preset info banner */
+.preset-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(14, 165, 233, 0.06);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.preset-info-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.preset-info strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-accent);
+  margin-bottom: 0.25rem;
+}
+
+.preset-info p {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Field hints and labels */
+.field-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: 0.3rem;
+  line-height: 1.4;
+}
+
+.field-hint code {
+  background: rgba(255,255,255,0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  color: var(--color-accent);
+}
+
+.field-hint.warn {
+  color: var(--color-degraded);
+}
+
+.required {
+  font-size: 0.7rem;
+  color: var(--color-offline);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 /* Results Table */

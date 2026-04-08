@@ -5,8 +5,10 @@ import { getServiceById } from '../services/repository.js';
 import { getServerById } from '../../modules/servers/repository.js';
 import { executeHttpChecker } from '../../checkers/http/index.js';
 import { executePingChecker } from '../../checkers/ping/index.js';
-import { executeCommandChecker } from '../../checkers/command/index.js';
+import { executeCommandChecker, buildCommandFromPreset } from '../../checkers/command/index.js';
 import type { Checker, CheckerType } from '../../shared/types.js';
+
+const COMMAND_PRESETS = ['curl', 'systemctl', 'tcp_port', 'dns', 'process', 'custom'];
 
 function validateConfig(checkerType: string, configJson?: string): string | null {
   if (!configJson) return null;
@@ -18,19 +20,33 @@ function validateConfig(checkerType: string, configJson?: string): string | null
   }
 
   if (checkerType === 'http') {
-    if (!parsed.url || typeof parsed.url !== 'string' || !parsed.url.startsWith('http')) return 'HTTP checker requires a valid url starting with http/https';
-    if (parsed.expectedStatus && typeof parsed.expectedStatus !== 'number') return 'expectedStatus must be number';
-    if (parsed.method && !['GET','POST','PUT','DELETE','PATCH','HEAD','OPTIONS'].includes(parsed.method.toUpperCase())) return 'Invalid HTTP method';
-    if (parsed.timeoutSeconds && (typeof parsed.timeoutSeconds !== 'number' || parsed.timeoutSeconds <= 0)) return 'timeoutSeconds must be > 0';
-    if (parsed.headers && (typeof parsed.headers !== 'object' || Array.isArray(parsed.headers))) return 'headers must be a valid JSON object';
+    if (!parsed.url || typeof parsed.url !== 'string' || !parsed.url.startsWith('http')) 
+      return 'HTTP checker requires a valid url starting with http/https';
+    if (parsed.expectedStatus && typeof parsed.expectedStatus !== 'number') 
+      return 'expectedStatus must be number';
+    if (parsed.method && !['GET','POST','PUT','DELETE','PATCH','HEAD','OPTIONS'].includes(parsed.method.toUpperCase())) 
+      return 'Invalid HTTP method';
+
   } else if (checkerType === 'ping') {
-    if (!parsed.host || typeof parsed.host !== 'string') return 'Ping checker requires a valid host string';
-    if (parsed.timeoutSeconds && (typeof parsed.timeoutSeconds !== 'number' || parsed.timeoutSeconds <= 0)) return 'timeoutSeconds must be > 0';
+    if (!parsed.host || typeof parsed.host !== 'string') 
+      return 'Ping checker requires a valid host string';
+
   } else if (checkerType === 'command') {
-    if (!parsed.command || typeof parsed.command !== 'string') return 'Command checker requires a shell command string';
-    if (parsed.timeoutSeconds && (typeof parsed.timeoutSeconds !== 'number' || parsed.timeoutSeconds <= 0)) return 'timeoutSeconds must be > 0';
-    if (parsed.serverId !== undefined && typeof parsed.serverId !== 'string') return 'serverId must be a string';
-    if (parsed.serverId && !getServerById(parsed.serverId)) return 'Server not found';
+    // For command checkers, we just validate the preset fields
+    const preset = parsed.preset || 'custom';
+    if (!COMMAND_PRESETS.includes(preset)) 
+      return `Invalid preset. Must be one of: ${COMMAND_PRESETS.join(', ')}`;
+    
+    // Validate serverId if provided
+    if (parsed.serverId && !getServerById(parsed.serverId)) 
+      return 'Server not found';
+
+    // Try building the command to validate required fields
+    try {
+      buildCommandFromPreset(parsed);
+    } catch (e: any) {
+      return e.message;
+    }
   }
   return null;
 }
@@ -76,15 +92,15 @@ export const checkersRoutes = new Elysia()
     .put('/:id', ({ params: { id }, body, set }) => {
       const bodyData = body as any;
       if (bodyData.type) {
-         if (bodyData.type !== 'ping' && bodyData.type !== 'http' && bodyData.type !== 'command') {
-           set.status = 400;
-           return { success: false, message: 'type must be ping, http or command' };
-         }
-         const validationError = validateConfig(bodyData.type, bodyData.configJson);
-         if (validationError) {
-           set.status = 400;
-           return { success: false, message: validationError };
-         }
+        if (!['ping', 'http', 'command'].includes(bodyData.type)) {
+          set.status = 400;
+          return { success: false, message: 'type must be ping, http or command' };
+        }
+        const validationError = validateConfig(bodyData.type, bodyData.configJson);
+        if (validationError) {
+          set.status = 400;
+          return { success: false, message: validationError };
+        }
       }
 
       const updated = repo.updateChecker(id, bodyData);
@@ -122,7 +138,7 @@ export const checkersRoutes = new Elysia()
 
       const tempChecker: Checker = {
         id: 'test',
-        serviceId,
+        serviceId: serviceId || 'test',
         type,
         configJson,
         name: 'Test',
@@ -150,7 +166,7 @@ export const checkersRoutes = new Elysia()
       body: t.Object({
         type: t.String(),
         configJson: t.String(),
-        serviceId: t.String()
+        serviceId: t.Optional(t.String())
       })
     })
   );
