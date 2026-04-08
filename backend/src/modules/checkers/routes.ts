@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import { randomUUID } from 'crypto';
 import * as repo from './repository.js';
 import { getServiceById } from '../services/repository.js';
+import { getServerById } from '../servers/repository.js';
 import { executeHttpChecker } from '../../checkers/http/index.js';
 import { executePingChecker } from '../../checkers/ping/index.js';
 import { executeCommandChecker } from '../../checkers/command/index.js';
@@ -28,6 +29,8 @@ function validateConfig(checkerType: string, configJson?: string): string | null
   } else if (checkerType === 'command') {
     if (!parsed.command || typeof parsed.command !== 'string') return 'Command checker requires a shell command string';
     if (parsed.timeoutSeconds && (typeof parsed.timeoutSeconds !== 'number' || parsed.timeoutSeconds <= 0)) return 'timeoutSeconds must be > 0';
+    if (parsed.serverId !== undefined && typeof parsed.serverId !== 'string') return 'serverId must be a string';
+    if (parsed.serverId && !getServerById(parsed.serverId)) return 'Server not found';
   }
   return null;
 }

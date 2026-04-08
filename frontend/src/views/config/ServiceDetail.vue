@@ -231,12 +231,48 @@
             <div v-if="checkerModal.form.type === 'command'" class="config-section">
               <div class="form-group">
                 <label>Shell Command</label>
-                <input v-model="checkerModal.config.command" type="text" placeholder="e.g. curl -sSf http://127.0.0.1:9099" required />
-                <small>Exit code 0 means SUCCESS. Other codes mean FAILURE. Running inside Docker container.</small>
+                <input v-model="checkerModal.config.command" type="text" placeholder="e.g. systemctl status nginx.service" required />
+                <small>Command to execute. Exit code 0 = SUCCESS.</small>
+              </div>
+              <div class="form-group">
+                <label>Target Server (optional)</label>
+                <select v-model="checkerModal.config.serverId" :disabled="servers.length === 0">
+                  <option value="">Local (Backend Server)</option>
+                  <option v-for="server in servers" :key="server.id" :value="server.id">
+                    {{ server.name }} ({{ server.host }})
+                  </option>
+                </select>
+                <small v-if="servers.length === 0">No servers configured. Commands will run locally.</small>
+                <small v-else>Select a server to run this command remotely via SSH. Leave empty for local execution.</small>
+              </div>
+              <div class="form-group">
+                <label>Success Pattern (optional)</label>
+                <input v-model="checkerModal.config.successPattern" type="text" placeholder="e.g. active (running)" />
+                <small>If provided, output must contain this string for success.</small>
               </div>
               <div class="form-group">
                 <label>Timeout Overwrite</label>
                 <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
+              </div>
+            </div>
+
+            <!-- Command Checker Help Section -->
+            <div class="command-help" v-if="checkerModal.form.type === 'command'">
+              <h4>💡 Common systemctl Commands</h4>
+              <div class="command-example">
+                <strong>Check if service is running:</strong>
+                <code>systemctl is-active myservice.service</code>
+                <small>Success Pattern: <code>active</code></small>
+              </div>
+              <div class="command-example">
+                <strong>Check service status (detailed):</strong>
+                <code>systemctl status myservice.service</code>
+                <small>Success Pattern: <code>active (running)</code></small>
+              </div>
+              <div class="command-example">
+                <strong>Check if process is running:</strong>
+                <code>pgrep -x myprocess > /dev/null</code>
+                <small>Success Pattern: (leave empty)</small>
               </div>
             </div>
           </div>
@@ -279,9 +315,9 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { servicesApi, checkersApi, monitoringApi } from '../../services/api';
+import { servicesApi, checkersApi, monitoringApi, serversApi } from '../../services/api';
 import { useNexus } from '../../composables/useNexus';
-import type { Checker, Service, CheckerResult, ServiceSnapshot } from '../../types';
+import type { Checker, Service, CheckerResult, ServiceSnapshot, Server } from '../../types';
 
 const route = useRoute();
 const router = useRouter();
@@ -294,6 +330,7 @@ const snapshots = ref<ServiceSnapshot[]>([]);
 
 const checkersLoading = ref(true);
 const isEditingService = ref(false);
+const servers = ref<Server[]>([]);
 
 const checkerModal = reactive({
   show: false,
@@ -308,7 +345,9 @@ const checkerModal = reactive({
     type: 'http' as 'http' | 'ping' | 'command',
     isActive: true
   },
-  config: {} as any
+  config: {
+    serverId: '' as string | null
+  } as any
 });
 
 const serviceId = computed(() => route.params.id as string);
@@ -349,11 +388,23 @@ const fetchSnapshots = async () => {
   snapshots.value = await monitoringApi.getServiceStatus();
 };
 
+const fetchServers = async () => {
+  try {
+    servers.value = await serversApi.getAll();
+  } catch (e) {
+    console.error('Failed to load servers', e);
+  }
+};
+
 const handleTypeChange = () => {
   // Clear config except command if switching to command, or URL if switching to HTTP
   const newType = checkerModal.form.type;
+  const serverId = checkerModal.config.serverId || null; // Preserve serverId
   if (newType === 'command') {
-    checkerModal.config = { command: (checkerModal.config.url && checkerModal.config.url.startsWith('curl')) ? checkerModal.config.url : '' };
+    checkerModal.config = {
+      command: (checkerModal.config.url && checkerModal.config.url.startsWith('curl')) ? checkerModal.config.url : '',
+      serverId
+    };
   } else if (newType === 'http') {
     checkerModal.config = { method: 'GET', url: '', expectedStatus: 200 };
   } else {
@@ -366,14 +417,15 @@ const openCheckerModal = (checker: Checker | null) => {
   checkerModal.isEdit = !!checker;
   checkerModal.checkerId = checker?.id || null;
   checkerModal.error = null;
-  
+
   if (checker) {
+    const parsedConfig = JSON.parse(checker.configJson || '{}');
     checkerModal.form = {
       name: checker.name,
       type: checker.type,
       isActive: checker.isActive
     };
-    checkerModal.config = JSON.parse(checker.configJson || '{}');
+    checkerModal.config = { ...parsedConfig };
   } else {
     checkerModal.form = {
       name: '',
@@ -384,7 +436,8 @@ const openCheckerModal = (checker: Checker | null) => {
       method: 'GET',
       url: '',
       expectedStatus: 200,
-      command: '' // For command type
+      command: '', // For command type
+      serverId: servers.value.length > 0 ? servers.value[0].id : null
     };
   }
 };
@@ -465,7 +518,11 @@ const goToEditService = () => {
 const formatConfigSummary = (checker: Checker) => {
   const conf = JSON.parse(checker.configJson || '{}');
   if (checker.type === 'http') return `${conf.method} ${conf.url}`;
-  if (checker.type === 'command') return `Cmd: ${conf.command || ''}`;
+  if (checker.type === 'command') {
+    const cmd = conf.command || '';
+    const pattern = conf.successPattern ? ` (contains: "${conf.successPattern}")` : '';
+    return `Cmd: ${cmd}${pattern}`;
+  }
   return `Ping ${conf.host || service.value?.host || 'default'}`;
 };
 
@@ -487,6 +544,7 @@ onMounted(() => {
   fetchCheckers();
   fetchResults();
   fetchSnapshots();
+  fetchServers();
 });
 </script>
 
@@ -806,6 +864,8 @@ onMounted(() => {
 
 .checker-modal {
   max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-header {
@@ -850,6 +910,12 @@ onMounted(() => {
   background: rgba(0,0,0,0.3);
   border-radius: 6px;
   border: 1px dashed rgba(56, 189, 248, 0.1);
+}
+
+/* Allow config section to scroll if too long */
+.config-fields {
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .modal-actions {
@@ -935,5 +1001,54 @@ onMounted(() => {
   border-radius: 4px;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* Command Checker Help */
+.command-help {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: rgba(14, 165, 233, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(14, 165, 233, 0.1);
+}
+
+.command-help h4 {
+  color: #0ea5e9;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.command-example {
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  background: rgba(0,0,0,0.4);
+  border-radius: 4px;
+}
+
+.command-example strong {
+  display: block;
+  color: #f1f5f9;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.command-example code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: #10b981;
+  background: rgba(0,0,0,0.6);
+  padding: 0.4rem 0.6rem;
+  border-radius: 3px;
+  margin: 0.4rem 0;
+}
+
+.command-example small {
+  display: block;
+  color: #64748b;
+  font-size: 0.75rem;
+  margin-top: 0.4rem;
 }
 </style>
