@@ -1,0 +1,96 @@
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import type { NexusService, NexusServer } from '../types';
+
+export function useAlerts() {
+  const servicesOfflineCount = ref(0);
+  const serversOfflineCount = ref(0);
+  let alertInterval: number | null = null;
+  let soundInterval: number | null = null;
+  let alertState = ref(false);
+  let componentMountedAt = ref<number>(0);
+
+  const playAlertSound = () => {
+    // Som de alerta grave
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContext) {
+        const audioCtx = new AudioContext();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(220, audioCtx.currentTime); // A3 note
+        oscillator.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.5);
+
+        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.5);
+      }
+    } catch (e) {
+      console.error('Error playing alert sound:', e);
+    }
+  };
+
+  const startAlertPulse = () => {
+    // Piscar a cada 5 segundos (inverte o estado)
+    alertInterval = window.setInterval(() => {
+      alertState.value = !alertState.value;
+    }, 5000);
+  };
+
+  const startSoundAlert = () => {
+    // Emitir som a cada 1 minuto enquanto houver offline
+    soundInterval = window.setInterval(() => {
+      if (servicesOfflineCount.value > 0 || serversOfflineCount.value > 0) {
+        playAlertSound();
+      }
+    }, 60000);
+  };
+
+  const setServicesOfflineCount = (count: number) => {
+    servicesOfflineCount.value = count;
+  };
+
+  const setServersOfflineCount = (count: number) => {
+    serversOfflineCount.value = count;
+  };
+
+  const getTotalOffline = () => servicesOfflineCount.value + serversOfflineCount.value;
+
+  const isAlertPulsing = computed(() => {
+    const totalOffline = getTotalOffline();
+    const timeSinceMount = componentMountedAt.value > 0 ? Date.now() - componentMountedAt.value : 0;
+    const shouldPulse = totalOffline > 0 && (timeSinceMount < 5000 || alertState.value);
+    console.log('[useAlerts] totalOffline:', totalOffline, 'timeSinceMount:', timeSinceMount, 'alertState:', alertState.value, 'shouldPulse:', shouldPulse);
+    return shouldPulse;
+  });
+
+  onMounted(() => {
+    componentMountedAt.value = Date.now();
+    startAlertPulse();
+    startSoundAlert();
+    console.log('NEXUS: Alert system initialized');
+  });
+
+  onUnmounted(() => {
+    if (alertInterval) {
+      clearInterval(alertInterval);
+      alertInterval = null;
+    }
+    if (soundInterval) {
+      clearInterval(soundInterval);
+      soundInterval = null;
+    }
+  });
+
+  return {
+    setServicesOfflineCount,
+    setServersOfflineCount,
+    isAlertPulsing
+  };
+}

@@ -6,7 +6,9 @@ const servers = ref<NexusServer[]>([]);
 
 export function useNexus() {
   let ws: WebSocket | null = null;
+  let pollInterval: number | null = null;
   const isConnected = ref(false);
+  let lastUpdate = Date.now();
 
   const fetchInitialState = async () => {
     try {
@@ -39,6 +41,7 @@ export function useNexus() {
 
     ws.onopen = () => {
       isConnected.value = true;
+      lastUpdate = Date.now();
       console.log('NEXUS Core WebSocket Connected');
     };
 
@@ -47,8 +50,8 @@ export function useNexus() {
         const payload: StatusUpdatePayload = JSON.parse(event.data);
         if (payload.type === 'status_update') {
           const index = services.value.findIndex(s => s.serviceId === payload.data.serviceId);
-          const checkerSummary = typeof payload.data.checkerSummaryJson === 'string' 
-            ? JSON.parse(payload.data.checkerSummaryJson) 
+          const checkerSummary = typeof payload.data.checkerSummaryJson === 'string'
+            ? JSON.parse(payload.data.checkerSummaryJson)
             : payload.data.checkerSummaryJson;
 
           if (index !== -1) {
@@ -60,6 +63,7 @@ export function useNexus() {
               lastFailureAt: payload.data.lastFailureAt,
               checkerSummary
             };
+            lastUpdate = Date.now();
           } else {
             fetchInitialState();
           }
@@ -75,6 +79,7 @@ export function useNexus() {
               uptimeSeconds: payload.data.uptimeSeconds,
               lastCheckedAt: payload.data.lastCheckedAt
             };
+            lastUpdate = Date.now();
           } else {
             fetchInitialServers();
           }
@@ -96,18 +101,39 @@ export function useNexus() {
     };
   };
 
+  const startPolling = () => {
+    // Poll a cada 30 segundos como fallback
+    pollInterval = window.setInterval(() => {
+      const timeSinceUpdate = Date.now() - lastUpdate;
+      // Só faz polling se não houver atualização há mais de 15 segundos
+      // Isso evita sobrecarregar o servidor quando o WebSocket está funcionando
+      if (timeSinceUpdate > 15000) {
+        fetchInitialState();
+        fetchInitialServers();
+        lastUpdate = Date.now();
+        console.log('NEXUS Polling data refresh (WebSocket inactive)');
+      }
+    }, 30000);
+  };
+
   onMounted(() => {
     fetchInitialState();
     fetchInitialServers();
     if (!ws) {
       initWebSocket();
     }
+    // Inicia o polling como fallback
+    startPolling();
   });
 
   onUnmounted(() => {
     if (ws) {
       ws.close();
       ws = null;
+    }
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
     }
   });
 

@@ -1,7 +1,7 @@
-import type { Checker, CheckerResult, Server } from '../../shared/types.js';
+import type { Checker, CheckerResult, Server } from '../../shared/types';
 import crypto from 'crypto';
-import { checkServerViaSSH } from '../ssh/index.js';
-import { getServerById } from '../../servers/repository.js';
+import { checkServerViaSSH } from '../ssh/index';
+import { getServerById } from '../../modules/servers/repository';
 
 interface CommandCheckerConfig {
   command: string;

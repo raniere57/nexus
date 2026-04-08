@@ -2,12 +2,20 @@ import { Database } from 'bun:sqlite';
 
 // Initialize the database with WAL mode for better concurrency
 const dbPath = process.env.DB_PATH || 'nexus.db';
-const db = new Database(dbPath, { create: true });
-db.exec('PRAGMA journal_mode = WAL;');
-// Important PRAGMAs for performance
-db.exec('PRAGMA synchronous = NORMAL;');
-db.exec('PRAGMA TEMP_STORE = MEMORY;');
-db.exec('PRAGMA foreign_keys = ON;');
+let db: Database;
+
+try {
+  console.log(`[DB] Opening database at ${dbPath}`);
+  db = new Database(dbPath, { create: true });
+  db.exec('PRAGMA journal_mode = WAL;');
+  db.exec('PRAGMA synchronous = NORMAL;');
+  db.exec('PRAGMA TEMP_STORE = MEMORY;');
+  db.exec('PRAGMA foreign_keys = ON;');
+} catch (e: any) {
+  console.error(`[DB] CRITICAL ERROR opening database: ${e.message}`);
+  // If we can't open the DB, the app will likely crash soon, which is what we want for logs
+  throw e; 
+}
 
 export { db };
 

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun test:*)",
+      "Bash(bun:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl -s http://localhost:3000/api/services)",
+      "Bash(curl -s http://localhost:3000/api/status)",
+      "Bash(curl -s http://localhost:8888)",
+      "Bash(curl -s http://localhost:3000/api/servers)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(pkill -f \"bun --watch\")"
+    ]
+  }
+}

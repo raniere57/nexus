@@ -13,6 +13,6 @@ initDB();
 startScheduler();
 startServerScheduler();
 
-app.listen(PORT, () => {
-  console.log(`🦊 Nexus Backend is running at http://localhost:${PORT}`);
+app.listen({ port: PORT, hostname: '0.0.0.0' }, () => {
+  console.log(`🦊 Nexus Backend is running at http://0.0.0.0:${PORT}`);
 });

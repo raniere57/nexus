@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { randomUUID } from 'crypto';
 import * as repo from './repository.js';
 import { getServiceById } from '../services/repository.js';
-import { getServerById } from '../servers/repository.js';
+import { getServerById } from '../../modules/servers/repository.js';
 import { executeHttpChecker } from '../../checkers/http/index.js';
 import { executePingChecker } from '../../checkers/ping/index.js';
 import { executeCommandChecker } from '../../checkers/command/index.js';

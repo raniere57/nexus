@@ -14,16 +14,16 @@
         <div class="stat-value">{{ onlineCount }}</div>
         <div class="stat-label">ONLINE</div>
       </div>
-      <div class="stat-block" :class="{'highlight-offline': offlineCount > 0}">
-        <div class="stat-value">{{ offlineCount }}</div>
+      <div class="stat-block" :class="{'highlight-offline': servicesOfflineCount > 0 || serversOfflineCount > 0, 'alert-pulse': isAlertPulsing}">
+        <div class="stat-value">{{ servicesOfflineCount + serversOfflineCount }}</div>
         <div class="stat-label">OFFLINE</div>
       </div>
     </div>
 
-    <div v-if="criticalServices.length > 0" class="critical-section">
+    <div v-if="criticalServices.length > 0" class="critical-section" :class="{ 'alert-pulse': isAlertPulsing }">
       <h3 class="section-title text-offline">CRITICAL ALERTS</h3>
       <div class="alert-list">
-        <div v-for="srv in criticalServices" :key="srv.serviceId" class="alert-item">
+        <div v-for="srv in criticalServices" :key="srv.serviceId" class="alert-item" :class="{ 'alert-pulse': isAlertPulsing }">
           <div class="alert-indicator"></div>
           <div class="alert-info">
             <div class="alert-name">{{ srv.serviceName }}</div>
@@ -33,10 +33,10 @@
       </div>
     </div>
 
-    <div v-if="offlineServers.length > 0" class="critical-section">
+    <div v-if="offlineServers.length > 0" class="critical-section" :class="{ 'alert-pulse': isAlertPulsing }">
       <h3 class="section-title text-offline">INFRASTRUCTURE OFFLINE</h3>
       <div class="alert-list">
-        <div v-for="srv in offlineServers" :key="srv.serverId" class="alert-item">
+        <div v-for="srv in offlineServers" :key="srv.serverId" class="alert-item" :class="{ 'alert-pulse': isAlertPulsing }">
           <div class="alert-indicator"></div>
           <div class="alert-info">
             <div class="alert-name">{{ srv.serverName }}</div>
@@ -46,10 +46,10 @@
       </div>
     </div>
 
-    <div v-if="degradedServices.length > 0" class="degraded-section">
+    <div v-if="degradedServices.length > 0" class="degraded-section" :class="{ 'alert-pulse': isAlertPulsing }">
       <h3 class="section-title text-degraded">DEGRADED NODES</h3>
       <div class="alert-list">
-        <div v-for="srv in degradedServices" :key="srv.serviceId" class="alert-item degraded">
+        <div v-for="srv in degradedServices" :key="srv.serviceId" class="alert-item degraded" :class="{ 'alert-pulse': isAlertPulsing }">
           <div class="alert-indicator"></div>
           <div class="alert-info">
             <div class="alert-name">{{ srv.serviceName }}</div>
@@ -73,16 +73,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import type { NexusService, NexusServer } from '../types';
+import { useAlerts } from '../composables/useAlerts';
 
 const props = defineProps<{
   services: NexusService[]
   servers: NexusServer[]
 }>();
 
+const { setServicesOfflineCount, setServersOfflineCount, isAlertPulsing } = useAlerts();
+
 const onlineCount = computed(() => props.services.filter(s => s.overallStatus === 'online').length);
-const offlineCount = computed(() => props.services.filter(s => s.overallStatus === 'offline').length);
+const servicesOfflineCount = computed(() => props.services.filter(s => s.overallStatus === 'offline').length);
+const serversOfflineCount = computed(() => (props.servers || []).filter(s => s.status === 'offline').length);
+
+// Usar watch para notificar o composável sempre que os contadores mudam
+watch([servicesOfflineCount, serversOfflineCount], ([newServiceOff, newServerOff]) => {
+  setServicesOfflineCount(newServiceOff);
+  setServersOfflineCount(newServerOff);
+}, { immediate: true });
 
 const criticalServices = computed(() => props.services.filter(s => s.overallStatus === 'offline'));
 const degradedServices = computed(() => props.services.filter(s => s.overallStatus === 'degraded'));
@@ -154,6 +164,11 @@ const formatTimeOnly = (isoString: string | null) => {
   100% { left: 100%; opacity: 0; }
 }
 
+@keyframes blinkText {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .stat-blocks {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -186,6 +201,15 @@ const formatTimeOnly = (isoString: string | null) => {
 
 .highlight-online .stat-value { color: var(--color-online); text-shadow: 0 0 10px var(--color-online-glow); }
 .highlight-offline .stat-value { color: var(--color-offline); text-shadow: 0 0 10px var(--color-offline-glow); }
+
+/* Fazer o contador de offline piscar quando há alertas ativos */
+.stat-block.highlight-offline.alert-pulse {
+  animation: alertPulse 5s infinite ease-in-out;
+}
+.stat-block.highlight-offline.alert-pulse .stat-value {
+  color: var(--color-offline);
+  animation: blinkText 5s infinite ease-in-out;
+}
 
 .section-title {
   font-size: 0.9rem;
@@ -226,12 +250,43 @@ const formatTimeOnly = (isoString: string | null) => {
   height: 8px;
   background: var(--color-offline);
   border-radius: 50%;
-  animation: flicker 2s infinite;
 }
 
 .alert-item.degraded .alert-indicator {
   background: var(--color-degraded);
   border-radius: 2px;
+}
+
+/* Alert Pulse Effect - pisca a cada 5s */
+@keyframes alertPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.98);
+  }
+}
+
+.alert-pulse {
+  animation: alertPulse 5s infinite ease-in-out;
+}
+
+.alert-pulse .alert-name {
+  color: var(--color-offline);
+  font-weight: 700;
+}
+
+.alert-pulse .alert-indicator {
+  animation: none;
+  background: var(--color-offline);
+  box-shadow: 0 0 15px var(--color-offline);
+}
+
+.critical-section.alert-pulse .section-title {
+  color: var(--color-offline);
+  animation: none;
 }
 
 .alert-name {

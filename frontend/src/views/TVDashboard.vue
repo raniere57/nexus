@@ -1,6 +1,6 @@
 <template>
   <div class="nexus-app tv-mode">
-    <component :is="isTvMode ? TVPerformanceBackground : BackgroundCanvas" />
+    <BackgroundCanvas />
     
     <header class="nexus-header">
       <div class="header-content">
