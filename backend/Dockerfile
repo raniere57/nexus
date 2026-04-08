@@ -1,8 +1,20 @@
 FROM oven/bun:1 as base
 WORKDIR /usr/src/app
 
-# Install core dependencies (minimal)
-RUN apt-get update && apt-get install -y iputils-ping && rm -rf /var/lib/apt/lists/*
+# Tools required for preset checkers:
+# - curl: cURL preset
+# - iputils-ping: Ping preset  
+# - openssh-client + sshpass: SSH remote execution
+# - netcat-openbsd: TCP port check preset (nc)
+# - dnsutils: DNS lookup preset (dig)
+RUN apt-get update && apt-get install -y \
+    curl \
+    iputils-ping \
+    openssh-client \
+    sshpass \
+    netcat-openbsd \
+    dnsutils \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package.json ./
 RUN bun install
