@@ -62,8 +62,62 @@ export function initDB() {
       FOREIGN KEY(checkerId) REFERENCES checkers(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS log_issue_clusters (
+      id TEXT PRIMARY KEY,
+      serviceId TEXT NOT NULL,
+      checkerId TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      normalizedMessage TEXT NOT NULL,
+      title TEXT NOT NULL,
+      sampleLog TEXT NOT NULL,
+      totalCount INTEGER NOT NULL DEFAULT 0,
+      firstSeenAt TEXT NOT NULL,
+      lastSeenAt TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'warning',
+      sourceType TEXT NOT NULL,
+      metadataJson TEXT DEFAULT '{}',
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(checkerId, fingerprint),
+      FOREIGN KEY(serviceId) REFERENCES services(id) ON DELETE CASCADE,
+      FOREIGN KEY(checkerId) REFERENCES checkers(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS log_issue_buckets (
+      clusterId TEXT NOT NULL,
+      bucketStart TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY(clusterId, bucketStart),
+      FOREIGN KEY(clusterId) REFERENCES log_issue_clusters(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS monitoring_alerts (
+      id TEXT PRIMARY KEY,
+      serviceId TEXT NOT NULL,
+      checkerId TEXT,
+      clusterId TEXT,
+      category TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      eventType TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      fingerprint TEXT,
+      metadataJson TEXT DEFAULT '{}',
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      acknowledgedAt TEXT,
+      FOREIGN KEY(serviceId) REFERENCES services(id) ON DELETE CASCADE,
+      FOREIGN KEY(checkerId) REFERENCES checkers(id) ON DELETE SET NULL,
+      FOREIGN KEY(clusterId) REFERENCES log_issue_clusters(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_checker_results_checkedAt ON checker_results(checkedAt);
     CREATE INDEX IF NOT EXISTS idx_checker_results_serviceId ON checker_results(serviceId);
+    CREATE INDEX IF NOT EXISTS idx_log_issue_clusters_serviceId ON log_issue_clusters(serviceId);
+    CREATE INDEX IF NOT EXISTS idx_log_issue_clusters_checkerId ON log_issue_clusters(checkerId);
+    CREATE INDEX IF NOT EXISTS idx_log_issue_clusters_lastSeenAt ON log_issue_clusters(lastSeenAt);
+    CREATE INDEX IF NOT EXISTS idx_log_issue_buckets_bucketStart ON log_issue_buckets(bucketStart);
+    CREATE INDEX IF NOT EXISTS idx_monitoring_alerts_createdAt ON monitoring_alerts(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_monitoring_alerts_serviceId ON monitoring_alerts(serviceId);
 
     CREATE TABLE IF NOT EXISTS service_snapshots (
       serviceId TEXT PRIMARY KEY,

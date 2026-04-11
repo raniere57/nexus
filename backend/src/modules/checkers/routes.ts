@@ -6,6 +6,7 @@ import { getServerById } from '../../modules/servers/repository.js';
 import { executeHttpChecker } from '../../checkers/http/index.js';
 import { executePingChecker } from '../../checkers/ping/index.js';
 import { executeCommandChecker, buildCommandFromPreset } from '../../checkers/command/index.js';
+import { previewLogChecker, validateLogCheckerConfig } from '../../checkers/log/index.js';
 import type { Checker, CheckerType } from '../../shared/types.js';
 
 const COMMAND_PRESETS = ['curl', 'systemctl', 'tcp_port', 'dns', 'process', 'custom'];
@@ -47,6 +48,8 @@ function validateConfig(checkerType: string, configJson?: string): string | null
     } catch (e: any) {
       return e.message;
     }
+  } else if (checkerType === 'log') {
+    return validateLogCheckerConfig(parsed);
   }
   return null;
 }
@@ -81,7 +84,7 @@ export const checkersRoutes = new Elysia()
       return { success: true, data: created };
     }, {
       body: t.Object({
-        type: t.Union([t.Literal('ping'), t.Literal('http'), t.Literal('command')]),
+        type: t.Union([t.Literal('ping'), t.Literal('http'), t.Literal('command'), t.Literal('log')]),
         name: t.String({ minLength: 1, error: 'Name cannot be empty' }),
         configJson: t.Optional(t.String()),
         isActive: t.Optional(t.Boolean())
@@ -92,9 +95,9 @@ export const checkersRoutes = new Elysia()
     .put('/:id', ({ params: { id }, body, set }) => {
       const bodyData = body as any;
       if (bodyData.type) {
-        if (!['ping', 'http', 'command'].includes(bodyData.type)) {
+        if (!['ping', 'http', 'command', 'log'].includes(bodyData.type)) {
           set.status = 400;
-          return { success: false, message: 'type must be ping, http or command' };
+          return { success: false, message: 'type must be ping, http, command or log' };
         }
         const validationError = validateConfig(bodyData.type, bodyData.configJson);
         if (validationError) {
@@ -155,6 +158,8 @@ export const checkersRoutes = new Elysia()
           result = await executePingChecker(tempChecker, service?.host || '127.0.0.1', timeout);
         } else if (type === 'command') {
           result = await executeCommandChecker(tempChecker, timeout);
+        } else if (type === 'log') {
+          result = await previewLogChecker(tempChecker, timeout);
         } else {
           return { success: false, message: 'Invalid type' };
         }

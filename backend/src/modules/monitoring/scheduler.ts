@@ -1,11 +1,11 @@
-import { getAllServices, getServiceSnapshotById, createOrUpdateSnapshot } from '../services/repository.js';
+import { getAllServices, getServiceSnapshotById } from '../services/repository.js';
 import { getCheckersByServiceId, createCheckerResult, getRecentResultsByService } from '../checkers/repository.js';
 import { executePingChecker } from '../../checkers/ping/index.js';
 import { executeHttpChecker } from '../../checkers/http/index.js';
 import { executeCommandChecker } from '../../checkers/command/index.js';
-import { broadcastStatusUpdate } from '../realtime/websocket.js';
-import type { Checker, Service, ServiceSnapshot, ServiceStatus } from '../../shared/types.js';
+import type { Service } from '../../shared/types.js';
 import { aggregateStatus } from './aggregator.js';
+import { updateServiceSnapshot } from './snapshots.js';
 import crypto from 'crypto';
 
 const runningTasks = new Set<string>();
@@ -34,9 +34,11 @@ export function startScheduler() {
       // and pass isRealCheck = false so we don't fake the check time!
       if (isStatusStale(lastCheck, now, intervalMs, snapshot?.overallStatus)) {
         console.log(`[Scheduler] Service ${service.id} is stale. Marking as unknown.`);
-        const summary = snapshot?.checkerSummaryJson ? JSON.parse(snapshot.checkerSummaryJson) : {};
-        summary.__meta = JSON.stringify({ staleReason: 'Check interval exceeded. Service hasn\'t replied recently.' });
-        updateServiceSnapshot(service.id, 'unknown', summary, false);
+        updateServiceSnapshot(service.id, {
+          overallStatus: 'unknown',
+          meta: { staleReason: 'Check interval exceeded. Service hasn\'t replied recently.' },
+          touchCheckTimestamps: false
+        });
       }
 
       if (now - lastCheck >= intervalMs) {
@@ -56,10 +58,15 @@ export async function checkService(service: Service) {
   console.log(`[Scheduler] Checking service: ${service.name} (${service.id})`);
   
   try {
-    const checkers = getCheckersByServiceId(service.id).filter(c => c.isActive);
+    const checkers = getCheckersByServiceId(service.id).filter(c => c.isActive && c.type !== 'log');
     
     if (checkers.length === 0) {
-      updateServiceSnapshot(service.id, 'unknown', {});
+      updateServiceSnapshot(service.id, {
+        overallStatus: 'unknown',
+        checkerStatuses: {},
+        replaceCheckerStatuses: true,
+        meta: { averageResponseTimeMs: 0, staleReason: null }
+      });
       return;
     }
 
@@ -104,31 +111,16 @@ export async function checkService(service: Service) {
     const overallStatus = aggregateStatus(Object.values(checkerSummary));
 
     const avgResponseTimeMs = checkers.length > 0 ? Math.round(totalTime / checkers.length) : 0;
-    checkerSummary['__meta'] = JSON.stringify({ averageResponseTimeMs: avgResponseTimeMs });
 
-    updateServiceSnapshot(service.id, overallStatus, checkerSummary);
+    updateServiceSnapshot(service.id, {
+      overallStatus,
+      checkerStatuses: checkerSummary,
+      replaceCheckerStatuses: true,
+      meta: { averageResponseTimeMs: avgResponseTimeMs, staleReason: null }
+    });
   } finally {
     runningTasks.delete(service.id);
   }
-}
-
-function updateServiceSnapshot(serviceId: string, status: ServiceStatus, checkerSummary: Record<string, string>, isRealCheck: boolean = true) {
-  const existing = getServiceSnapshotById(serviceId);
-  const now = new Date().toISOString();
-  
-  const snapshot: ServiceSnapshot = {
-    serviceId,
-    overallStatus: status,
-    lastCheckedAt: isRealCheck ? now : (existing?.lastCheckedAt || now),
-    lastOkAt: status === 'online' ? now : (existing?.lastOkAt || null),
-    lastFailureAt: status === 'offline' || status === 'degraded' ? now : (existing?.lastFailureAt || null),
-    checkerSummaryJson: JSON.stringify(checkerSummary)
-  };
-
-  createOrUpdateSnapshot(serviceId, snapshot);
-  
-  // Broadcast if status changed or just to refresh TV
-  broadcastStatusUpdate(snapshot);
 }
 
 function cleanupOldResults() {

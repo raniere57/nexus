@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { getServiceSnapshots, getAllServices } from '../services/repository.js';
 import { getRecentResultsByService, getResults } from '../checkers/repository.js';
+import { parseCheckerSummaryJson } from './snapshots.js';
 
 export const monitoringRoutes = new Elysia({ prefix: '/api' })
   .get('/status', () => {
@@ -21,24 +22,28 @@ export const monitoringRoutes = new Elysia({ prefix: '/api' })
       const problemCheckerNames: string[] = [];
       let staleReason = null;
       let averageResponseTimeMs = 0;
+      let logWarningCount = 0;
+      let logCriticalCount = 0;
+      let lastLogIssueAt = null;
+      let lastLogAlertAt = null;
 
       let sanitizedSummary = {};
 
       if (snap?.checkerSummaryJson) {
-        const summary = JSON.parse(snap.checkerSummaryJson);
-        if (summary.__meta) {
-          const meta = JSON.parse(summary.__meta);
-          staleReason = meta.staleReason || null;
-          averageResponseTimeMs = meta.averageResponseTimeMs || 0;
-          delete summary.__meta;
-        }
-        
-        sanitizedSummary = summary;
-        const checkerIds = Object.keys(summary);
+        const parsed = parseCheckerSummaryJson(snap.checkerSummaryJson);
+        staleReason = parsed.meta.staleReason || null;
+        averageResponseTimeMs = parsed.meta.averageResponseTimeMs || 0;
+        logWarningCount = parsed.log.warningCount || 0;
+        logCriticalCount = parsed.log.criticalCount || 0;
+        lastLogIssueAt = parsed.log.lastIssueAt || null;
+        lastLogAlertAt = parsed.log.lastAlertAt || null;
+
+        sanitizedSummary = parsed.checkerStatuses;
+        const checkerIds = Object.keys(parsed.checkerStatuses);
         activeCheckersCount = checkerIds.length;
         
         checkerIds.forEach(id => {
-          if (summary[id] === 'success') {
+          if ((parsed.checkerStatuses as Record<string, string>)[id] === 'success') {
             okCheckersCount++;
           } else {
             problematicCheckersCount++;
@@ -65,6 +70,10 @@ export const monitoringRoutes = new Elysia({ prefix: '/api' })
         problemCheckerNames,
         averageResponseTimeMs,
         staleReason,
+        logWarningCount,
+        logCriticalCount,
+        lastLogIssueAt,
+        lastLogAlertAt,
         checkerSummary: sanitizedSummary
       };
     });

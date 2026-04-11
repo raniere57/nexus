@@ -6,6 +6,7 @@ import { checkersRoutes } from './modules/checkers/routes.js';
 import { monitoringRoutes } from './modules/monitoring/routes.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { serversRoutes } from './modules/servers/routes.js';
+import { logsRoutes } from './modules/logs/routes.js';
 import { addSubscriber, removeSubscriber } from './modules/realtime/websocket.js';
 import { getServiceSnapshots } from './modules/services/repository.js';
 import { getAllServerSnapshots } from './modules/servers/repository.js';
@@ -84,4 +85,5 @@ export const app = new Elysia()
   .use(checkersRoutes)
   .use(monitoringRoutes)
   .use(authRoutes)
-  .use(serversRoutes);
+  .use(serversRoutes)
+  .use(logsRoutes);
