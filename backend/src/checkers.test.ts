@@ -1,10 +1,10 @@
 import { expect, test, describe, beforeAll } from 'bun:test';
-import { resolveHttpTimeout } from './checkers/http/index.js';
-import { createCheckerResult, getRecentResultsByService, createChecker } from './modules/checkers/repository.js';
-import { createService } from './modules/services/repository.js';
-import { checkService } from './modules/monitoring/scheduler.js';
+import { resolveHttpTimeout } from './checkers/http/index.ts';
+import { createCheckerResult, getRecentResultsByService, createChecker } from './modules/checkers/repository.ts';
+import { createService } from './modules/services/repository.ts';
+import { checkService } from './modules/monitoring/scheduler.ts';
 import crypto from 'crypto';
-import { initDB } from './db/index.js';
+import { initDB } from './db/index.ts';
 
 beforeAll(() => {
   initDB();

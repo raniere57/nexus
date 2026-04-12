@@ -1,11 +1,11 @@
-import { getAllServices, getServiceSnapshotById } from '../services/repository.js';
-import { getCheckersByServiceId, createCheckerResult, getRecentResultsByService } from '../checkers/repository.js';
-import { executePingChecker } from '../../checkers/ping/index.js';
-import { executeHttpChecker } from '../../checkers/http/index.js';
-import { executeCommandChecker } from '../../checkers/command/index.js';
-import type { Service } from '../../shared/types.js';
-import { aggregateStatus } from './aggregator.js';
-import { updateServiceSnapshot } from './snapshots.js';
+import { getAllServices, getServiceSnapshotById } from '../services/repository.ts';
+import { getCheckersByServiceId, createCheckerResult, getRecentResultsByService } from '../checkers/repository.ts';
+import { executePingChecker } from '../../checkers/ping/index.ts';
+import { executeHttpChecker } from '../../checkers/http/index.ts';
+import { executeCommandChecker } from '../../checkers/command/index.ts';
+import type { Service } from '../../shared/types.ts';
+import { aggregateStatus } from './aggregator.ts';
+import { updateServiceSnapshot } from './snapshots.ts';
 import crypto from 'crypto';
 
 const runningTasks = new Set<string>();
@@ -124,7 +124,7 @@ export async function checkService(service: Service) {
 }
 
 function cleanupOldResults() {
-  import('../../db/index.js').then(({ db }) => {
+  import('../../db/index.ts').then(({ db }) => {
     try {
       console.log('[Scheduler] Cleaning up old results');
       // Keep last 7 days roughly, simple approach

@@ -1,7 +1,7 @@
-import { getAllServers, getServerSnapshotById, createOrUpdateServerSnapshot } from '../servers/repository.js';
-import { checkServerViaSSH } from '../../checkers/ssh/index.js';
-import { broadcastServerUpdate } from '../realtime/websocket.js';
-import type { Server, ServerSnapshot } from '../../shared/types.js';
+import { getAllServers, getServerSnapshotById, createOrUpdateServerSnapshot } from '../servers/repository.ts';
+import { checkServerViaSSH } from '../../checkers/ssh/index.ts';
+import { broadcastServerUpdate } from '../realtime/websocket.ts';
+import type { Server, ServerSnapshot } from '../../shared/types.ts';
 
 const runningServerTasks = new Set<string>();
 

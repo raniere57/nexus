@@ -1,13 +1,13 @@
 import { Elysia, t } from 'elysia';
 import { randomUUID } from 'crypto';
-import * as repo from './repository.js';
-import { getServiceById } from '../services/repository.js';
-import { getServerById } from '../../modules/servers/repository.js';
-import { executeHttpChecker } from '../../checkers/http/index.js';
-import { executePingChecker } from '../../checkers/ping/index.js';
-import { executeCommandChecker, buildCommandFromPreset } from '../../checkers/command/index.js';
-import { previewLogChecker, validateLogCheckerConfig } from '../../checkers/log/index.js';
-import type { Checker, CheckerType } from '../../shared/types.js';
+import * as repo from './repository.ts';
+import { getServiceById } from '../services/repository.ts';
+import { getServerById } from '../../modules/servers/repository.ts';
+import { executeHttpChecker } from '../../checkers/http/index.ts';
+import { executePingChecker } from '../../checkers/ping/index.ts';
+import { executeCommandChecker, buildCommandFromPreset } from '../../checkers/command/index.ts';
+import { previewLogChecker, validateLogCheckerConfig } from '../../checkers/log/index.ts';
+import type { Checker, CheckerType } from '../../shared/types.ts';
 
 const COMMAND_PRESETS = ['curl', 'systemctl', 'tcp_port', 'dns', 'process', 'custom'];
 

@@ -1,5 +1,5 @@
-import { db } from '../../db/index.js';
-import type { Checker, CheckerResult } from '../../shared/types.js';
+import { db } from '../../db/index.ts';
+import type { Checker, CheckerResult } from '../../shared/types.ts';
 
 export function getCheckersByServiceId(serviceId: string): Checker[] {
   return db.query(`SELECT * FROM checkers WHERE serviceId = ?`).all(serviceId) as Checker[];

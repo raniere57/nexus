@@ -1,5 +1,5 @@
-import { db } from '../../db/index.js';
-import type { Server, ServerSnapshot } from '../../shared/types.js';
+import { db } from '../../db/index.ts';
+import type { Server, ServerSnapshot } from '../../shared/types.ts';
 
 export function getAllServers(): Server[] {
   return db.query(`SELECT * FROM servers`).all() as Server[];

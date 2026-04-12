@@ -1,4 +1,4 @@
-import type { ServiceStatus } from '../../shared/types.js';
+import type { ServiceStatus } from '../../shared/types.ts';
 
 export function aggregateStatus(checkerStatuses: string[]): ServiceStatus {
   if (checkerStatuses.length === 0) return 'unknown';

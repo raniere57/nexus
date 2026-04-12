@@ -1,6 +1,6 @@
-import { createOrUpdateSnapshot, getServiceSnapshotById } from '../services/repository.js';
-import { broadcastStatusUpdate } from '../realtime/websocket.js';
-import type { ServiceSnapshot, ServiceStatus, SnapshotLogSummary, SnapshotMeta } from '../../shared/types.js';
+import { createOrUpdateSnapshot, getServiceSnapshotById } from '../services/repository.ts';
+import { broadcastStatusUpdate } from '../realtime/websocket.ts';
+import type { ServiceSnapshot, ServiceStatus, SnapshotLogSummary, SnapshotMeta } from '../../shared/types.ts';
 
 interface ParsedSummary {
   checkerStatuses: Record<string, string>;

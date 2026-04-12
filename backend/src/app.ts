@@ -1,15 +1,15 @@
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { swagger } from '@elysiajs/swagger';
-import { servicesRoutes } from './modules/services/routes.js';
-import { checkersRoutes } from './modules/checkers/routes.js';
-import { monitoringRoutes } from './modules/monitoring/routes.js';
-import { authRoutes } from './modules/auth/routes.js';
-import { serversRoutes } from './modules/servers/routes.js';
-import { logsRoutes } from './modules/logs/routes.js';
-import { addSubscriber, removeSubscriber } from './modules/realtime/websocket.js';
-import { getServiceSnapshots } from './modules/services/repository.js';
-import { getAllServerSnapshots } from './modules/servers/repository.js';
+import { servicesRoutes } from './modules/services/routes.ts';
+import { checkersRoutes } from './modules/checkers/routes.ts';
+import { monitoringRoutes } from './modules/monitoring/routes.ts';
+import { authRoutes } from './modules/auth/routes.ts';
+import { serversRoutes } from './modules/servers/routes.ts';
+import { logsRoutes } from './modules/logs/routes.ts';
+import { addSubscriber, removeSubscriber } from './modules/realtime/websocket.ts';
+import { getServiceSnapshots } from './modules/services/repository.ts';
+import { getAllServerSnapshots } from './modules/servers/repository.ts';
 
 export const app = new Elysia()
   .use(cors())

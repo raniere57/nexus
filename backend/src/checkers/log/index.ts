@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import { getServerById } from '../../modules/servers/repository.js';
-import type { Checker, CheckerResult, LogCheckerConfig, LogSeverity } from '../../shared/types.js';
+import { getServerById } from '../../modules/servers/repository.ts';
+import type { Checker, CheckerResult, LogCheckerConfig, LogSeverity } from '../../shared/types.ts';
 
 const DEFAULT_RELEVANT_PATTERNS = [
   /\berror\b/i,

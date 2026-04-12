@@ -1,4 +1,4 @@
-import type { Server, ServerSnapshot } from '../../shared/types.js';
+import type { Server, ServerSnapshot } from '../../shared/types.ts';
 
 /**
  * Check a server via SSH and collect CPU, RAM, Disk metrics.

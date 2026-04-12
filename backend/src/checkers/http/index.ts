@@ -1,4 +1,4 @@
-import type { Checker, CheckerResult } from '../../shared/types.js';
+import type { Checker, CheckerResult } from '../../shared/types.ts';
 import { randomUUID } from 'crypto';
 
 interface HttpCheckerConfig {

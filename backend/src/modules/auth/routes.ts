@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { db } from '../../db/index.js';
+import { db } from '../../db/index.ts';
 
 export const authRoutes = new Elysia({ prefix: '/api/auth' })
   .post('/verify', async ({ body, set }) => {

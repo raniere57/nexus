@@ -1,5 +1,5 @@
-import type { ServiceSnapshot, ServerSnapshot } from '../../shared/types.js';
-import { getServiceSnapshots } from '../services/repository.js';
+import type { ServiceSnapshot, ServerSnapshot } from '../../shared/types.ts';
+import { getServiceSnapshots } from '../services/repository.ts';
 
 let subscribers = new Set<any>(); // Simple set to hold ws connections
 

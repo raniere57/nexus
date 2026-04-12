@@ -4,7 +4,7 @@ import {
   normalizeLogMessage,
   resolveLogSeverity,
   shouldProcessLogLine
-} from './index.js';
+} from './index.ts';
 
 describe('Log Checker Rules Engine', () => {
   test('normalizes dynamic values into a stable fingerprint basis', () => {

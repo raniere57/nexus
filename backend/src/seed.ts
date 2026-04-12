@@ -1,6 +1,6 @@
-import { initDB, db } from './db/index.js';
-import * as repo from './modules/services/repository.js';
-import * as checkerRepo from './modules/checkers/repository.js';
+import { initDB, db } from './db/index.ts';
+import * as repo from './modules/services/repository.ts';
+import * as checkerRepo from './modules/checkers/repository.ts';
 
 console.log('[Seed] Initializing database schema...');
 initDB();

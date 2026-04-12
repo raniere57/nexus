@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { randomUUID } from 'crypto';
-import * as repo from './repository.js';
-import type { Service } from '../../shared/types.js';
+import * as repo from './repository.ts';
+import type { Service } from '../../shared/types.ts';
 
 function validateServiceData(data: any): string | null {
   if (data.name !== undefined) {

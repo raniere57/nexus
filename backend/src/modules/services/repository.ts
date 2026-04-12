@@ -1,5 +1,5 @@
-import { db } from '../../db/index.js';
-import type { Service, ServiceSnapshot } from '../../shared/types.js';
+import { db } from '../../db/index.ts';
+import type { Service, ServiceSnapshot } from '../../shared/types.ts';
 
 export function getAllServices(): Service[] {
   return db.query(`SELECT * FROM services`).all() as Service[];

@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
-import { getServiceSnapshots, getAllServices } from '../services/repository.js';
-import { getRecentResultsByService, getResults } from '../checkers/repository.js';
-import { parseCheckerSummaryJson } from './snapshots.js';
+import { getServiceSnapshots, getAllServices } from '../services/repository.ts';
+import { getRecentResultsByService, getResults, getAllActiveCheckers } from '../checkers/repository.ts';
+import { parseCheckerSummaryJson } from './snapshots.ts';
 
 export const monitoringRoutes = new Elysia({ prefix: '/api' })
   .get('/status', () => {
@@ -10,7 +10,7 @@ export const monitoringRoutes = new Elysia({ prefix: '/api' })
   .get('/status/tv', () => {
     const services = getAllServices();
     const snapshots = getServiceSnapshots();
-    const checkers = require('../checkers/repository.js').getAllActiveCheckers();
+    const checkers = getAllActiveCheckers();
     
     // Merge snapshot and service data for optimized TV view
     return services.map(srv => {

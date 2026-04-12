@@ -1,8 +1,8 @@
-import { app } from './app.js';
-import { initDB } from './db/index.js';
-import { startScheduler } from './modules/monitoring/scheduler.js';
-import { startServerScheduler } from './modules/monitoring/serverScheduler.js';
-import { startLogCheckerEngine } from './modules/logs/engine.js';
+import { app } from './app.ts';
+import { initDB } from './db/index.ts';
+import { startScheduler } from './modules/monitoring/scheduler.ts';
+import { startServerScheduler } from './modules/monitoring/serverScheduler.ts';
+import { startLogCheckerEngine } from './modules/logs/engine.ts';
 
 const PORT = process.env.PORT || 3000;
 
