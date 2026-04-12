@@ -4,6 +4,7 @@ import type { NexusService, NexusServer } from '../types';
 export function useAlerts() {
   const servicesOfflineCount = ref(0);
   const serversOfflineCount = ref(0);
+  const logCriticalCount = ref(0);
   let alertInterval: number | null = null;
   let soundInterval: number | null = null;
   let alertState = ref(false);
@@ -46,7 +47,7 @@ export function useAlerts() {
   const startSoundAlert = () => {
     // Emitir som a cada 1 minuto enquanto houver offline
     soundInterval = window.setInterval(() => {
-      if (servicesOfflineCount.value > 0 || serversOfflineCount.value > 0) {
+      if (servicesOfflineCount.value > 0 || serversOfflineCount.value > 0 || logCriticalCount.value > 0) {
         playAlertSound();
       }
     }, 60000);
@@ -60,10 +61,14 @@ export function useAlerts() {
     serversOfflineCount.value = count;
   };
 
-  const getTotalOffline = () => servicesOfflineCount.value + serversOfflineCount.value;
+  const setLogCriticalCount = (count: number) => {
+    logCriticalCount.value = count;
+  };
+
+  const getTotalCritical = () => servicesOfflineCount.value + serversOfflineCount.value + logCriticalCount.value;
 
   const isAlertPulsing = computed(() => {
-    const totalOffline = getTotalOffline();
+    const totalOffline = getTotalCritical();
     const timeSinceMount = componentMountedAt.value > 0 ? Date.now() - componentMountedAt.value : 0;
     const shouldPulse = totalOffline > 0 && (timeSinceMount < 5000 || alertState.value);
     console.log('[useAlerts] totalOffline:', totalOffline, 'timeSinceMount:', timeSinceMount, 'alertState:', alertState.value, 'shouldPulse:', shouldPulse);
@@ -91,6 +96,7 @@ export function useAlerts() {
   return {
     setServicesOfflineCount,
     setServersOfflineCount,
+    setLogCriticalCount,
     isAlertPulsing
   };
 }

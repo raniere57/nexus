@@ -59,6 +59,32 @@
       </div>
     </div>
 
+    <div v-if="criticalLogServices.length > 0" class="critical-section" :class="{ 'alert-pulse': isAlertPulsing }">
+      <h3 class="section-title text-offline">CRITICAL LOG INCIDENTS</h3>
+      <div class="alert-list">
+        <div v-for="srv in criticalLogServices" :key="`${srv.serviceId}-critical-log`" class="alert-item" :class="{ 'alert-pulse': isAlertPulsing }">
+          <div class="alert-indicator"></div>
+          <div class="alert-info">
+            <div class="alert-name">{{ srv.serviceName }}</div>
+            <div class="alert-time">{{ srv.logCriticalCount }} critical cluster(s) in the last 24h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="warningLogServices.length > 0" class="degraded-section">
+      <h3 class="section-title text-degraded">LOG WARNINGS</h3>
+      <div class="alert-list">
+        <div v-for="srv in warningLogServices" :key="`${srv.serviceId}-warning-log`" class="alert-item degraded">
+          <div class="alert-indicator"></div>
+          <div class="alert-info">
+            <div class="alert-name">{{ srv.serviceName }}</div>
+            <div class="alert-time">{{ srv.logWarningCount }} warning cluster(s) in the last 24h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="activity-log">
       <h3 class="section-title">ACTIVE NODES (RECENTLY CHECKED)</h3>
       <div class="log-list">
@@ -82,21 +108,25 @@ const props = defineProps<{
   servers: NexusServer[]
 }>();
 
-const { setServicesOfflineCount, setServersOfflineCount, isAlertPulsing } = useAlerts();
+const { setServicesOfflineCount, setServersOfflineCount, setLogCriticalCount, isAlertPulsing } = useAlerts();
 
 const onlineCount = computed(() => props.services.filter(s => s.overallStatus === 'online').length);
 const servicesOfflineCount = computed(() => props.services.filter(s => s.overallStatus === 'offline').length);
 const serversOfflineCount = computed(() => (props.servers || []).filter(s => s.status === 'offline').length);
+const logCriticalCount = computed(() => props.services.reduce((total, service) => total + (service.logCriticalCount || 0), 0));
 
 // Usar watch para notificar o composável sempre que os contadores mudam
-watch([servicesOfflineCount, serversOfflineCount], ([newServiceOff, newServerOff]) => {
+watch([servicesOfflineCount, serversOfflineCount, logCriticalCount], ([newServiceOff, newServerOff, newCriticalLogs]) => {
   setServicesOfflineCount(newServiceOff);
   setServersOfflineCount(newServerOff);
+  setLogCriticalCount(newCriticalLogs);
 }, { immediate: true });
 
 const criticalServices = computed(() => props.services.filter(s => s.overallStatus === 'offline'));
 const degradedServices = computed(() => props.services.filter(s => s.overallStatus === 'degraded'));
 const offlineServers = computed(() => (props.servers || []).filter(s => s.status === 'offline'));
+const criticalLogServices = computed(() => props.services.filter(s => (s.logCriticalCount || 0) > 0));
+const warningLogServices = computed(() => props.services.filter(s => (s.logWarningCount || 0) > 0 && (s.logCriticalCount || 0) === 0));
 
 const recentServices = computed(() => {
   return [...props.services]

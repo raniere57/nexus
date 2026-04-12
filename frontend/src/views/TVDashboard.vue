@@ -52,13 +52,16 @@ const systemStatusText = computed(() => {
   if (!services.value || services.value.length === 0) return 'INITIALIZING...';
   if (services.value.some(s => s.overallStatus === 'offline')) return 'CRITICAL';
   if (servers.value.some(s => s.status === 'offline')) return 'CRITICAL';
+  if (services.value.some(s => (s.logCriticalCount || 0) > 0)) return 'CRITICAL';
   if (services.value.some(s => s.overallStatus === 'degraded')) return 'DEGRADED';
+  if (services.value.some(s => (s.logWarningCount || 0) > 0)) return 'DEGRADED';
   return 'ONLINE';
 });
 
 const hasCriticalAlerts = computed(() => {
   return services.value.some(s => s.overallStatus === 'offline') || 
-         servers.value.some(s => s.status === 'offline');
+         servers.value.some(s => s.status === 'offline') ||
+         services.value.some(s => (s.logCriticalCount || 0) > 0);
 });
 
 const updateTime = () => {

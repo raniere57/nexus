@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package.json ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
 COPY src/ ./src/
 COPY tsconfig.json ./

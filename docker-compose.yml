@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -8,15 +6,19 @@ services:
     container_name: nexus_backend
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DB_PATH=/data/nexus.db
+      NODE_ENV: production
+      PORT: 3000
+      DB_PATH: /data/nexus.db
     volumes:
       - nexus_data:/data
-    # Exposing the port is optional if we only access it through the frontend nginx proxy.
-    # We will expose it just in case direct access to /docs swagger is needed locally.
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -27,7 +29,8 @@ services:
     ports:
       - "8888:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   nexus_data:

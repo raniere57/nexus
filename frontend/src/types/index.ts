@@ -1,5 +1,6 @@
 export type ServiceStatus = 'online' | 'degraded' | 'offline' | 'unknown';
-export type CheckerType = 'ping' | 'http';
+export type CheckerType = 'ping' | 'http' | 'command' | 'log';
+export type LogSeverity = 'warning' | 'critical';
 
 export interface Service {
   id: string;
@@ -47,6 +48,41 @@ export interface ServiceSnapshot {
   checkerSummaryJson: string;
 }
 
+export interface LogIssueCluster {
+  id: string;
+  serviceId: string;
+  checkerId: string;
+  fingerprint: string;
+  normalizedMessage: string;
+  title: string;
+  sampleLog: string;
+  totalCount: number;
+  count24h: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  severity: LogSeverity;
+  sourceType: 'file' | 'command' | 'http';
+  metadataJson: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonitoringAlert {
+  id: string;
+  serviceId: string;
+  checkerId: string | null;
+  clusterId: string | null;
+  category: 'service' | 'server' | 'log';
+  severity: LogSeverity;
+  eventType: 'cluster_created' | 'spike' | 'severity_changed';
+  title: string;
+  message: string;
+  fingerprint: string | null;
+  metadataJson: string;
+  createdAt: string;
+  acknowledgedAt: string | null;
+}
+
 // For TV specific lightweight payload
 export interface NexusService {
   serviceId: string;
@@ -57,6 +93,10 @@ export interface NexusService {
   lastCheckedAt: string | null;
   lastOkAt: string | null;
   lastFailureAt: string | null;
+  logWarningCount: number;
+  logCriticalCount: number;
+  lastLogIssueAt?: string | null;
+  lastLogAlertAt?: string | null;
   checkerSummary: Record<string, any>;
 }
 

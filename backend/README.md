@@ -34,6 +34,8 @@ To boot the complete application with the frontend:
 ```bash
 docker-compose up -d --build
 ```
+> **Routing**: In Docker Compose the backend is kept on the internal Compose network only. Use the frontend container on port `8888` for the UI, `http://HOST:8888/health` for backend health and `http://HOST:8888/docs` for Swagger.
+>
 > **Note about Ping**: The backend Docker container (`oven/bun:1`) installs `iputils-ping` automatically at build time, assuring ICMP checks will run successfully in Alpine/Debian base images.
 
 ## Features & Endpoints
@@ -47,7 +49,7 @@ A Swagger interface is available at `/docs`.
 - `GET /api/results`: Provides filterable history of executions: `?serviceId=X&limit=50`.
 
 ### Realtime WebSocket
-- `ws://localhost:3000/ws/status`: Connects the dashboard for realtime UI. 
+- `ws://localhost:3000/ws/status` in local backend development, or `ws://HOST:8888/ws/status` when running through Docker Compose: Connects the dashboard for realtime UI.
   - **Event `initial_state`**: Broadcasted immediately upon connection. Contains a snapshot of everything.
   - **Event `status_update`**: Emitted seamlessly whenever services toggle status dynamically.
 

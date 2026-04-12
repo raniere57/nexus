@@ -1,4 +1,4 @@
-import type { Checker, Service, Server, CheckerResult, ServiceSnapshot } from '../types';
+import type { Checker, Service, Server, CheckerResult, ServiceSnapshot, LogIssueCluster, MonitoringAlert } from '../types';
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -87,6 +87,23 @@ export const monitoringApi = {
   getResults: (serviceId?: string, limit = 50) => {
     const url = serviceId ? `/api/results?serviceId=${serviceId}&limit=${limit}` : `/api/results?limit=${limit}`;
     return fetch(url).then(res => handleResponse<CheckerResult[]>(res));
+  }
+};
+
+export const logsApi = {
+  getClusters: (options: { serviceId?: string; checkerId?: string; severity?: 'warning' | 'critical'; limit?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (options.serviceId) search.set('serviceId', options.serviceId);
+    if (options.checkerId) search.set('checkerId', options.checkerId);
+    if (options.severity) search.set('severity', options.severity);
+    search.set('limit', String(options.limit || 100));
+    return fetch(`/api/logs/clusters?${search.toString()}`).then(res => handleResponse<LogIssueCluster[]>(res));
+  },
+  getAlerts: (options: { serviceId?: string; limit?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (options.serviceId) search.set('serviceId', options.serviceId);
+    search.set('limit', String(options.limit || 50));
+    return fetch(`/api/alerts?${search.toString()}`).then(res => handleResponse<MonitoringAlert[]>(res));
   }
 };
 

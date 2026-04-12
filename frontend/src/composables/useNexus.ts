@@ -22,6 +22,34 @@ export function useNexus() {
     }
   };
 
+  const extractLogSummary = (checkerSummary: Record<string, any>) => {
+    const logSummary = checkerSummary?.__log;
+    if (!logSummary) {
+      return {
+        logWarningCount: 0,
+        logCriticalCount: 0,
+        lastLogIssueAt: null,
+        lastLogAlertAt: null
+      };
+    }
+
+    let parsed = logSummary;
+    if (typeof logSummary === 'string') {
+      try {
+        parsed = JSON.parse(logSummary);
+      } catch {
+        parsed = {};
+      }
+    }
+
+    return {
+      logWarningCount: parsed.warningCount || 0,
+      logCriticalCount: parsed.criticalCount || 0,
+      lastLogIssueAt: parsed.lastIssueAt || null,
+      lastLogAlertAt: parsed.lastAlertAt || null
+    };
+  };
+
   const fetchInitialServers = async () => {
     try {
       const res = await fetch('/api/servers/status');
@@ -53,6 +81,7 @@ export function useNexus() {
           const checkerSummary = typeof payload.data.checkerSummaryJson === 'string'
             ? JSON.parse(payload.data.checkerSummaryJson)
             : payload.data.checkerSummaryJson;
+          const logSummary = extractLogSummary(checkerSummary);
 
           if (index !== -1) {
             services.value[index] = {
@@ -61,6 +90,10 @@ export function useNexus() {
               lastCheckedAt: payload.data.lastCheckedAt,
               lastOkAt: payload.data.lastOkAt,
               lastFailureAt: payload.data.lastFailureAt,
+              logWarningCount: logSummary.logWarningCount,
+              logCriticalCount: logSummary.logCriticalCount,
+              lastLogIssueAt: logSummary.lastLogIssueAt,
+              lastLogAlertAt: logSummary.lastLogAlertAt,
               checkerSummary
             };
             lastUpdate = Date.now();

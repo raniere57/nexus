@@ -107,6 +107,19 @@
             </table>
           </div>
         </section>
+
+        <section class="section">
+          <div class="section-header">
+            <h2 class="section-title">Log Intelligence</h2>
+            <button @click="fetchLogClusters" class="btn btn-ghost btn-sm">Refresh</button>
+          </div>
+
+          <LogIssueList
+            :clusters="logClusters"
+            :loading="logClustersLoading"
+            empty-message="No grouped log issues detected for this service."
+          />
+        </section>
       </div>
 
       <!-- Right: Service Data -->
@@ -188,6 +201,7 @@
                 <option value="http">HTTP Fetch</option>
                 <option value="ping">Ping</option>
                 <option value="command">Command / Preset</option>
+                <option value="log">Log Intelligence</option>
               </select>
             </div>
             <div class="form-group half" v-if="checkerModal.form.type === 'command'">
@@ -376,6 +390,69 @@
                 <input v-model.number="checkerModal.config.timeoutSeconds" type="number" placeholder="Default" />
               </div>
             </div>
+
+            <!-- LOG INTELLIGENCE -->
+            <div v-if="checkerModal.form.type === 'log'" class="config-section">
+              <div class="form-row">
+                <div class="form-group half">
+                  <label>Source Type</label>
+                  <select v-model="checkerModal.config.sourceType" @change="handleLogSourceChange">
+                    <option value="file">File Tail</option>
+                    <option value="command">Command Stream</option>
+                    <option value="http">HTTP Stream</option>
+                  </select>
+                </div>
+                <div class="form-group half" v-if="checkerModal.config.sourceType !== 'http'">
+                  <label>Target Server (optional)</label>
+                  <select v-model="checkerModal.config.serverId">
+                    <option value="">Local (backend container)</option>
+                    <option v-for="s in servers" :key="s.id" :value="s.id">{{ s.name }} — {{ s.host }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div v-if="checkerModal.config.sourceType === 'file'" class="form-group">
+                <label>File Path</label>
+                <input v-model="checkerModal.config.path" type="text" placeholder="e.g. /var/log/app.log" required />
+                <small class="field-hint">The engine tails the file continuously and groups similar errors into one incident.</small>
+              </div>
+
+              <div v-if="checkerModal.config.sourceType === 'command'" class="form-group">
+                <label>Streaming Command</label>
+                <input v-model="checkerModal.config.command" type="text" placeholder="e.g. docker logs -f api" required />
+                <small class="field-hint">Use a long-running command that continuously emits log lines to stdout or stderr.</small>
+              </div>
+
+              <div v-if="checkerModal.config.sourceType === 'http'" class="form-group">
+                <label>HTTP Stream URL</label>
+                <input v-model="checkerModal.config.url" type="text" placeholder="https://logs.example.com/stream" required />
+                <small class="field-hint">Use a chunked text stream or similar endpoint that keeps pushing log lines.</small>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group half">
+                  <label>Spike Threshold / min</label>
+                  <input v-model.number="checkerModal.config.spikeThresholdPerMinute" type="number" placeholder="5" />
+                </div>
+                <div class="form-group half">
+                  <label>Promotion Threshold / min</label>
+                  <input v-model.number="checkerModal.config.promotionThresholdPerMinute" type="number" placeholder="10" />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group half">
+                  <label>Promotion Threshold / 24h</label>
+                  <input v-model.number="checkerModal.config.promotionThreshold24h" type="number" placeholder="100" />
+                </div>
+                <div class="form-group half">
+                  <label>Preview Window (s)</label>
+                  <input v-model.number="checkerModal.config.previewWindowSeconds" type="number" placeholder="3" />
+                </div>
+              </div>
+
+              <small class="field-hint">Default relevance rules detect lines such as ERROR, Exception and Fail, normalize dynamic values and group repeats by fingerprint.</small>
+            </div>
           </div>
 
           <div v-if="checkerModal.error" class="modal-error">{{ checkerModal.error }}</div>
@@ -414,11 +491,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue';
+import { ref, computed, reactive, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { servicesApi, checkersApi, monitoringApi, serversApi } from '../../services/api';
+import { servicesApi, checkersApi, monitoringApi, serversApi, logsApi } from '../../services/api';
 import { useNexus } from '../../composables/useNexus';
-import type { Checker, Service, CheckerResult, ServiceSnapshot, Server } from '../../types';
+import LogIssueList from '../../components/LogIssueList.vue';
+import type { Checker, Service, CheckerResult, ServiceSnapshot, Server, LogIssueCluster } from '../../types';
 
 const route = useRoute();
 const router = useRouter();
@@ -428,10 +506,13 @@ const service = ref<Service | null>(null);
 const checkers = ref<Checker[]>([]);
 const recentResults = ref<CheckerResult[]>([]);
 const snapshots = ref<ServiceSnapshot[]>([]);
+const logClusters = ref<LogIssueCluster[]>([]);
 
 const checkersLoading = ref(true);
 const isEditingService = ref(false);
 const servers = ref<Server[]>([]);
+const logClustersLoading = ref(false);
+let logClusterRefreshInterval: number | null = null;
 
 const checkerModal = reactive({
   show: false,
@@ -443,7 +524,7 @@ const checkerModal = reactive({
   testResult: null as any | null,
   form: {
     name: '',
-    type: 'http' as 'http' | 'ping' | 'command',
+    type: 'http' as 'http' | 'ping' | 'command' | 'log',
     isActive: true
   },
   config: {} as any
@@ -483,6 +564,15 @@ const fetchResults = async () => {
   recentResults.value = await monitoringApi.getResults(serviceId.value, 15);
 };
 
+const fetchLogClusters = async () => {
+  try {
+    logClustersLoading.value = true;
+    logClusters.value = await logsApi.getClusters({ serviceId: serviceId.value, limit: 50 });
+  } finally {
+    logClustersLoading.value = false;
+  }
+};
+
 const fetchSnapshots = async () => {
   snapshots.value = await monitoringApi.getServiceStatus();
 };
@@ -515,9 +605,34 @@ const handleTypeChange = () => {
     checkerModal.config = { preset: 'curl', url: '', serverId: '' };
   } else if (newType === 'http') {
     checkerModal.config = { method: 'GET', url: '', expectedStatus: 200 };
-  } else {
+  } else if (newType === 'ping') {
     checkerModal.config = { host: '' };
+  } else {
+    checkerModal.config = {
+      sourceType: 'file',
+      path: '',
+      serverId: '',
+      spikeThresholdPerMinute: 5,
+      promotionThresholdPerMinute: 10,
+      promotionThreshold24h: 100,
+      previewWindowSeconds: 3
+    };
   }
+};
+
+const handleLogSourceChange = () => {
+  const current = checkerModal.config;
+  checkerModal.config = {
+    sourceType: current.sourceType,
+    serverId: current.sourceType === 'http' ? undefined : (current.serverId || ''),
+    path: current.sourceType === 'file' ? (current.path || '') : undefined,
+    command: current.sourceType === 'command' ? (current.command || '') : undefined,
+    url: current.sourceType === 'http' ? (current.url || '') : undefined,
+    spikeThresholdPerMinute: current.spikeThresholdPerMinute || 5,
+    promotionThresholdPerMinute: current.promotionThresholdPerMinute || 10,
+    promotionThreshold24h: current.promotionThreshold24h || 100,
+    previewWindowSeconds: current.previewWindowSeconds || 3
+  };
 };
 
 const handlePresetChange = () => {
@@ -544,6 +659,19 @@ const openCheckerModal = (checker: any | null) => {
     // Backward compat: old raw command checkers get mapped to 'custom' preset
     if (checker.type === 'command' && !parsedConfig.preset) {
       checkerModal.config.preset = 'custom';
+    }
+    if (checker.type === 'log') {
+      checkerModal.config = {
+        sourceType: parsedConfig.sourceType || 'file',
+        path: parsedConfig.path || '',
+        command: parsedConfig.command || '',
+        url: parsedConfig.url || '',
+        serverId: parsedConfig.serverId || '',
+        spikeThresholdPerMinute: parsedConfig.spikeThresholdPerMinute || 5,
+        promotionThresholdPerMinute: parsedConfig.promotionThresholdPerMinute || 10,
+        promotionThreshold24h: parsedConfig.promotionThreshold24h || 100,
+        previewWindowSeconds: parsedConfig.previewWindowSeconds || 3
+      };
     }
   } else {
     checkerModal.form = { name: '', type: 'http', isActive: true };
@@ -598,6 +726,7 @@ const handleSaveChecker = async () => {
     
     checkerModal.show = false;
     fetchCheckers();
+    fetchLogClusters();
   } catch (e: any) {
     checkerModal.error = e.message;
   } finally {
@@ -609,6 +738,7 @@ const handleDeleteChecker = async (id: string) => {
   if (confirm('Delete this checker?')) {
     await checkersApi.delete(id);
     fetchCheckers();
+    fetchLogClusters();
   }
 };
 
@@ -632,6 +762,11 @@ const formatConfigSummary = (checker: Checker) => {
     const pattern = conf.successPattern ? ` (contains: "${conf.successPattern}")` : '';
     return `Cmd: ${cmd}${pattern}`;
   }
+  if (checker.type === 'log') {
+    if (conf.sourceType === 'file') return `Tail ${conf.path}`;
+    if (conf.sourceType === 'command') return `Stream ${conf.command}`;
+    return `HTTP ${conf.url}`;
+  }
   return `Ping ${conf.host || service.value?.host || 'default'}`;
 };
 
@@ -652,8 +787,17 @@ onMounted(() => {
   fetchServiceData();
   fetchCheckers();
   fetchResults();
+  fetchLogClusters();
   fetchSnapshots();
   fetchServers();
+  logClusterRefreshInterval = window.setInterval(fetchLogClusters, 15000);
+});
+
+onUnmounted(() => {
+  if (logClusterRefreshInterval) {
+    clearInterval(logClusterRefreshInterval);
+    logClusterRefreshInterval = null;
+  }
 });
 </script>
 
