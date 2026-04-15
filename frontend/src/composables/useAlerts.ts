@@ -12,41 +12,12 @@ export function useAlerts() {
 
   const playAlertSound = () => {
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContext) {
-        const audioCtx = new AudioContext();
-        const now = audioCtx.currentTime;
-        const notes = [
-          { frequency: 880, start: 0, duration: 0.1 },
-          { frequency: 880, start: 0.15, duration: 0.1 },
-          { frequency: 880, start: 0.3, duration: 0.1 },
-          { frequency: 880, start: 0.45, duration: 0.1 }
-        ];
-
-        notes.forEach(({ frequency, start, duration }) => {
-          const oscillator = audioCtx.createOscillator();
-          const gainNode = audioCtx.createGain();
-
-          oscillator.type = 'triangle';
-          oscillator.frequency.setValueAtTime(frequency, now + start);
-12, now + start + 0.02
-          gainNode.gain.setValueAtTime(0.0001, now + start);
-          gainNode.gain.exponentialRampToValueAtTime(0.08, now + start + 0.015);
-          gainNode.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
-
-          oscillator.connect(gainNode);
-          gainNode.connect(audioCtx.destination);
-
-          oscillator.start(now + start);
-          oscillator.stop(now + start + duration + 0.02);
-        });
-
-        window.setTimeout(() => {
-          audioCtx.close().catch(() => undefined);
-        }, 1000);
-      }
+      console.log('Playing MP3 alert sound');
+      const audio = new Audio('/alert.mp3');
+      audio.volume = 0.3;
+      audio.play().then(() => console.log('MP3 played successfully')).catch(e => console.error('Error playing MP3:', e));
     } catch (e) {
-      console.error('Error playing alert sound:', e);
+      console.error('Error creating audio:', e);
     }
   };
 
@@ -58,12 +29,12 @@ export function useAlerts() {
   };
 
   const startSoundAlert = () => {
-    // Emitir som a cada 1 minuto enquanto houver offline
+    // Emitir som a cada 30 segundos enquanto houver offline
     soundInterval = window.setInterval(() => {
       if (servicesOfflineCount.value > 0 || serversOfflineCount.value > 0 || logCriticalCount.value > 0) {
         playAlertSound();
       }
-    }, 60000);
+    }, 30000);
   };
 
   const setServicesOfflineCount = (count: number) => {
@@ -93,6 +64,8 @@ export function useAlerts() {
     startAlertPulse();
     startSoundAlert();
     console.log('NEXUS: Alert system initialized');
+    // Teste temporário: tocar som ao montar
+    setTimeout(() => playAlertSound(), 2000);
   });
 
   onUnmounted(() => {
