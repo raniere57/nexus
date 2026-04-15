@@ -11,26 +11,37 @@ export function useAlerts() {
   let componentMountedAt = ref<number>(0);
 
   const playAlertSound = () => {
-    // Som de alerta grave
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContext) {
         const audioCtx = new AudioContext();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
+        const now = audioCtx.currentTime;
+        const notes = [
+          { frequency: 784, start: 0, duration: 0.13 },
+          { frequency: 988, start: 0.16, duration: 0.14 }
+        ];
 
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.setValueAtTime(220, audioCtx.currentTime); // A3 note
-        oscillator.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.5);
+        notes.forEach(({ frequency, start, duration }) => {
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
 
-        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+          oscillator.type = 'triangle';
+          oscillator.frequency.setValueAtTime(frequency, now + start);
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
+          gainNode.gain.setValueAtTime(0.0001, now + start);
+          gainNode.gain.exponentialRampToValueAtTime(0.08, now + start + 0.015);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
 
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.5);
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+
+          oscillator.start(now + start);
+          oscillator.stop(now + start + duration + 0.02);
+        });
+
+        window.setTimeout(() => {
+          audioCtx.close().catch(() => undefined);
+        }, 1000);
       }
     } catch (e) {
       console.error('Error playing alert sound:', e);
