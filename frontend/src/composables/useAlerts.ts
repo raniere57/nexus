@@ -17,8 +17,10 @@ export function useAlerts() {
         const audioCtx = new AudioContext();
         const now = audioCtx.currentTime;
         const notes = [
-          { frequency: 784, start: 0, duration: 0.13 },
-          { frequency: 988, start: 0.16, duration: 0.14 }
+          { frequency: 880, start: 0, duration: 0.1 },
+          { frequency: 880, start: 0.15, duration: 0.1 },
+          { frequency: 880, start: 0.3, duration: 0.1 },
+          { frequency: 880, start: 0.45, duration: 0.1 }
         ];
 
         notes.forEach(({ frequency, start, duration }) => {
@@ -27,7 +29,7 @@ export function useAlerts() {
 
           oscillator.type = 'triangle';
           oscillator.frequency.setValueAtTime(frequency, now + start);
-
+12, now + start + 0.02
           gainNode.gain.setValueAtTime(0.0001, now + start);
           gainNode.gain.exponentialRampToValueAtTime(0.08, now + start + 0.015);
           gainNode.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
@@ -91,8 +93,6 @@ export function useAlerts() {
     startAlertPulse();
     startSoundAlert();
     console.log('NEXUS: Alert system initialized');
-    // Teste temporário: tocar som ao montar
-    setTimeout(() => playAlertSound(), 1000);
   });
 
   onUnmounted(() => {
