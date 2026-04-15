@@ -91,6 +91,8 @@ export function useAlerts() {
     startAlertPulse();
     startSoundAlert();
     console.log('NEXUS: Alert system initialized');
+    // Teste temporário: tocar som ao montar
+    setTimeout(() => playAlertSound(), 1000);
   });
 
   onUnmounted(() => {
